@@ -50,28 +50,28 @@ vector<string> Split(const string& str, int splitLength) {
    return ret;
 }
 
+string permutation(string ret, int poz = 0) {
+  if (poz == ret.size()) {
+    cout << ret << endl;
+  } else {
+    for (int i = poz; i < ret.size(); i++) {
+      swap(ret[i], ret[poz]);
+      permutation(ret, poz + 1);
+      swap(ret[i], ret[poz]);
+    }
+  }
 
-
-// string entry_perm() {
-
-//     cout << "Podaj ciag znakow do zaszyfrowania: " << endl; 
-//     cin >> str;
-
-//     // Po podzieleniu na bloki 64 bitowe, bierzemy i na każdym bloku robimy permutację początkow
-//     Split(str,8);
-
-//     return 0;
-// }
-
-
-vector<string> main() {
-
-    cout << "Wprowadz ciag znakow do zaszyfrowania: " << endl;
-    cin >> str;
-
-    Split(str,8);
-    
-    return Split;
-
+  return ret;
 }
 
+int main() {
+    string text = "F5A3B7B8B45F2C7N8N2C5B7A";
+    int length = 8;
+    vector<string> result = Split(text, length);
+
+    for (const auto& part : result) {
+        cout << part << endl;
+    }
+
+    return 0;
+}
