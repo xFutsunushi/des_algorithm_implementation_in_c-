@@ -37,7 +37,3 @@ int main(){
     return 0;
 
 }
-
-
-
-// W domu schematy blokowe !!!! 
