@@ -10,7 +10,7 @@
 // Nowa funkcja dla 16 rund kluczy feistela 
 
 
-//using namespace std;
+using namespace std;
 
 // Stałe tablice dla DES
 
@@ -99,7 +99,7 @@ uint64_t permute(uint64_t input, const int *table, int size) {
 }
 
 // Funkcja do konwersji tekstu na 64-bitowy blok
-uint64_t text_to_block(const std::string &text, size_t block_index) {
+uint64_t text_to_block(const string &text, size_t block_index) {
     uint64_t block = 0;
     for (size_t i = 0; i < 8; ++i) {
         if (block_index * 8 + i < text.size()) {
@@ -110,8 +110,8 @@ uint64_t text_to_block(const std::string &text, size_t block_index) {
 }
 
 // Funkcja do konwersji bloku 64-bitowego na tekst
-std::string block_to_text(uint64_t block) {
-    std::string text;
+string block_to_text(uint64_t block) {
+    string text;
     for (int i = 7; i >= 0; --i) {
         text += static_cast<char>((block >> (i * 8)) & 0xFF);
     }
