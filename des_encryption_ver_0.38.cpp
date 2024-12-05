@@ -1,3 +1,9 @@
+/*
+https://billstclair.com/grabbe/des.htm
+DES Algorithm implementation in C++
+Author: Łukasz Świeżak
+ */
+
 #include <iostream>
 #include <random>
 #include <cstdint>
@@ -168,11 +174,9 @@ string generate_64bit_key() {
     return ss.str();
 }
 
-
 uint64_t text_to_hex(const std::string &text, size_t block_index) {
     uint64_t block = 0;
     size_t index = block_index * 8;
-
     // Sprawdzamy, czy mamy wystarczająco znaków
     for (size_t i = 0; i < 8; ++i) {
         if (index + i < text.size()) {
@@ -188,17 +192,6 @@ void print_hex(uint64_t block) {
     stringstream ss;
     ss << hex << setw(16) << setfill('0') << block;
     cout << ss.str() << endl;
-}
-
-
-// Funkcja wykonująca permutację IP (Initial permutation)
-uint64_t apply_initial_permutation(uint64_t block) {
-    uint64_t permuted_block = 0;
-    for (int i = 0; i < 64; ++i) {
-        int bit = (block >> (64 - IP[i])) & 1; // & 1 operacja AND i przesunięcie bitowe w prawo
-        permuted_block |= (bit << (63 - i));  // |= bitowe OR i przesunięcie bitów w lewo
-    }
-    return permuted_block;
 }
 
 // Funkcja permutacji ogólnej
@@ -244,6 +237,61 @@ uint32_t permute_P(uint32_t input) {
     return permute(static_cast<uint64_t>(input) << 32, P, 32);
 }
 
+// Funkcja pomocnicza do konwersji 64-bitowego klucza do bitów
+bitset<64> string_to_bitset(const string& str) {
+    bitset<64> result;
+    for (size_t i = 0; i < str.size(); ++i) {
+        result[i] = (str[i] == '1');
+    }
+    return result;
+}
+
+// Funkcja do generowania kluczy rundy (16 kluczy)
+vector<bitset<48>> generate_round_keys(const string& masterkey) {
+    // Konwersja masterkey na bitset 64-bitowy
+    bitset<64> key = string_to_bitset(masterkey);
+
+    // Permutacja początkowa (Initial Permutation)
+    const int initial_permutation[] = { /* Permutation table (IP) dla DES */ };
+    bitset<56> permuted_key = apply_permutation(key, initial_permutation);
+
+    // Podział na dwie części 28-bitowe
+    bitset<28> left = permuted_key.to_ulong() >> 28;
+    bitset<28> right = permuted_key.to_ulong() & 0x0FFFFFFF;
+
+    vector<bitset<48>> round_keys;
+
+    // Generowanie 16 kluczy rundy
+    for (int round = 0; round < 16; ++round) {
+        // Rotacja obu części
+        left = rotate_left(left, 1);
+        right = rotate_left(right, 1);
+
+        // Połączenie obu części
+        bitset<56> combined_key = (left.to_ulong() << 28) | right.to_ulong();
+
+        // Permutacja finalna (P) dla klucza rundy
+        const int round_key_permutation[] = { /* Permutation table (PC-2) */ };
+        round_keys.push_back(apply_permutation(combined_key, round_key_permutation));
+    }
+
+    return round_keys;
+}
+
+// Funkcja pomocnicza do rotacji w lewo
+bitset<28> rotate_left(bitset<28>& part, int n) {
+    return (part << n) | (part >> (28 - n));
+}
+
+// Funkcja pomocnicza do permutacji
+bitset<56> apply_permutation(const bitset<64>& input, const int* perm_table) {
+    bitset<56> result;
+    for (int i = 0; i < 56; ++i) {
+        result[i] = input[perm_table[i] - 1]; // Indeksowanie od 1
+    }
+    return result;
+}
+
 // Funkcja rundy Feistela
 pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
     cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
@@ -272,14 +320,6 @@ pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_ke
     return {R, new_R};
 }
 
-// void test_permutation() {
-//     uint64_t test_block = 0x0123456789ABCDEF;
-//     uint64_t permuted = apply_initial_permutation(test_block);
-//     // Spodziewany wynik dla testowego bloku
-//     uint64_t expected = 0x...; // Wynik po IP
-//     assert(permuted == expected && "Initial Permutation failed!");
-// }
-
 int main() {
     string input; // zmienna do trzymania wejścia z klawiatury
     cout << "Enter plain text: " << endl; 
@@ -287,37 +327,25 @@ int main() {
 
     string masterkey = generate_64bit_key();
     cout << "Generated 64-bit key: " << masterkey << endl;
+    cout << endl;
     // Save to file fo decrypt on remote host
     ofstream file;
     file.open("generated_key.txt");
     file << masterkey;
     file.close();
 
-    cout << "Entry text: " << input << endl;
-    cout << "Find blocks:" << endl;
-
-    // for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
-    //     uint64_t block = text_to_hex(input, i);
-    //     //cout << "Block " << i << ": ";
-    //     print_hex(block);
-    //     //cout << "Block before and after initial permutation" << endl;
-    //     //cout << bitset<64>(block) << endl; 
-
-    //     uint64_t perm = apply_initial_permutation(block);
-    //     //cout << bitset<64>(perm) << setfill('0') << endl;
-    //     //cout << setw(16) << setfill('0') << hex << block << endl;
-    //     print_hex(perm);
-    //     cout << "---------------------------------------" << endl;
-    // }
+    // cout << "Entry text: " << input << endl;
+    // cout << "Find blocks:" << endl;
 
 std::vector<uint64_t> blocks;
 for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
     uint64_t block = text_to_hex(input, i);
     print_hex(block);
 
-    uint64_t perm = apply_initial_permutation(block);
-    print_hex(perm);
-    cout << "---------------------------------------" << endl;
+    //uint64_t perm = apply_initial_permutation(block);
+    uint64_t perm = permute(block, IP, 64);
+    //print_hex(perm);
+    //cout << "---------------------------------------" << endl;
 
     blocks.push_back(block);
 
@@ -329,16 +357,5 @@ for (size_t i = 0; i < blocks.size(); ++i) {
     cout << "Block " << i << " - L: " << hex << L << ", R: " << hex << R << endl;
     }
 }
-
-
-
-// TEST
-
-    //uint64_t block = 0x416c61206d61206b;
-    //uint64_t permuted_block = apply_initial_permutation(block);
-
-    //cout << "Blok wejściowy: " << bitset<64>(block) << endl;
-    //cout << "Blok po Initial Permutation: " << bitset<64>(permuted_block) << endl;
-
     return 0;
 }
