@@ -138,13 +138,12 @@ int main() {
     using namespace std;
 
     string input;
-    // Dodać funkcję na poniższą linie - dynamiczne generowanie klucza 64 bit i zapisanie do pliku 
     uint64_t key = 0x133457788AACDEE1; // 64-bitowy klucz
 
     cout << "Podaj tekst do zaszyfrowania: ";
     getline(cin, input);
 
-    // Padding - wypełniamy ciąg znaków zerami jeśli nie równa się 8 bitom
+    // Wypełniamy ciąg znaków zerami jeśli nie równa się 8 bitom
     while (input.size() % 8 != 0) {
         input += '\0';
     }

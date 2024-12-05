@@ -1,0 +1,38 @@
+Notatki z kodu i wycięte elementy:
+
+    // Wypełniamy ciąg znaków zerami jeśli nie równa się 8 bitom
+    while (input.size() % 8 != 0) {
+        input += '\0';
+    }
+    
+    // Obliczamy ile bloków 64-bitowych zmieści się w danym tekście
+    size_t num_blocks = (input.size() + 7) / 8;  // Zaokrąglenie w górę do liczby pełnych bloków 8-znakowych
+
+    // Tworzymy wektor, który przechowa nasze bloki
+    vector<uint64_t> blocks;
+
+    for ( size_t i = 0; i < num_blocks; ++i ) {
+        uint64_t block = text_to_block(input, i);
+        blocks.push_back(block);
+    }
+
+    // Wypisujemy przetworzone bloki
+    cout << "Tekst wejściowy: " << input << endl;
+    cout << "Znalezione bloki (jako liczby 64-bitowe):" << endl;
+
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        cout << "Blok " << i << ": " << blocks[i] << endl;
+        cout << "Blok " << i << " (w bitach): " << bitset<64>(i) << endl;
+//        cout << "Blok " << i << " (w hex): 0x" << hex << blocks[i] << dec << endl;
+
+
+// Funkcja permutacji
+uint64_t permute(uint64_t input, const int *table, int size) {
+    uint64_t output = 0;
+    for (int i = 0; i < size; ++i) {
+        if (input & (1ULL << (64 - table[i]))) { // 1ULL to unsigned long long 
+            output |= (1ULL << (size - i - 1));
+        }
+    }
+    return output;
+}
