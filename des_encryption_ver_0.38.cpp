@@ -6,7 +6,8 @@
 #include <string>
 #include <iomanip>
 #include <sstream>
-
+#include <vector>
+#include <cassert>
 
 using namespace std;
 
@@ -159,13 +160,14 @@ string generate_64bit_key() {
     uniform_int_distribution<unsigned long long> dis(0, 0xFFFFFFFFFFFFFFFF);  // Zakres 64 bitów
 
     // Generujemy losowy 64-bitowy klucz
-    unsigned long long key = dis(gen);
+    unsigned long long masterkey = dis(gen);
 
     // Konwertujemy na format hex (16 znaków)
     stringstream ss;
-    ss << hex << setw(16) << setfill('0') << key;
+    ss << hex << setw(16) << setfill('0') << masterkey;
     return ss.str();
 }
+
 
 uint64_t text_to_hex(const std::string &text, size_t block_index) {
     uint64_t block = 0;
@@ -199,34 +201,136 @@ uint64_t apply_initial_permutation(uint64_t block) {
     return permuted_block;
 }
 
+// Funkcja permutacji ogólnej
+uint64_t permute(uint64_t input, const int *permutation_table, size_t output_size) {
+    uint64_t output = 0;
+    for (size_t i = 0; i < output_size; ++i) {
+        size_t bit_position = permutation_table[i] - 1;
+        output |= ((input >> (63 - bit_position)) & 1) << (output_size - 1 - i);
+    }
+    return output;
+}
+
+// Funkcja do generowania kluczy rundy
+vector<uint64_t> generate_round_keys(uint64_t master_key) {
+    vector<uint64_t> round_keys;
+
+    // Klucz główny jest dzielony na Lewą i Prawą część (28 bitów każda, uproszczenie)
+    uint32_t C = (master_key >> 28) & 0xFFFFFFF; // Lewa połowa klucza (28 bitów)
+    uint32_t D = master_key & 0xFFFFFFF;        // Prawa połowa klucza (28 bitów)
+
+    for (int round = 0; round < 16; ++round) {
+        // Przesunięcie w lewo (round + 1 to przykładowa logika przesunięcia)
+        int shifts = (round % 2 == 0) ? 1 : 2;
+        C = ((C << shifts) | (C >> (28 - shifts))) & 0xFFFFFFF;
+        D = ((D << shifts) | (D >> (28 - shifts))) & 0xFFFFFFF;
+
+        // Połączenie C i D, kompresja do 48 bitów za pomocą PC2
+        uint64_t combined = (static_cast<uint64_t>(C) << 28) | D;
+        uint64_t round_key = permute(combined, PC2, 48); // Permutacja kompresji
+        round_keys.push_back(round_key);
+    }
+
+    return round_keys;
+}
+
+// Funkcja ekspansji (E)
+uint64_t expand(uint32_t R) {
+    return permute(static_cast<uint64_t>(R) << 32, E, 48); // R zamieniamy na 64-bitowy
+}
+
+// Funkcja permutacji P
+uint32_t permute_P(uint32_t input) {
+    return permute(static_cast<uint64_t>(input) << 32, P, 32);
+}
+
+// Funkcja rundy Feistela
+pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
+    cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+    
+    // Ekspansja Prawa część (R) na 48 bitów
+    uint64_t expanded_R = expand(R);
+    cout << "Rozszerzone R: " << bitset<48>(expanded_R) << endl;
+
+    // XOR z kluczem rundy
+    uint64_t xor_result = expanded_R ^ round_key;
+    cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
+
+    // S-Boxy (brak pełnej implementacji S-Boxów — wynik bezpośrednio kopiowany)
+    // Zakładamy uproszczony wynik (pierwsze 32 bity XOR wyników)
+    uint32_t sbox_result = static_cast<uint32_t>((xor_result >> 16) ^ xor_result); // Placeholder
+    cout << "Wynik S-Boxów: " << bitset<32>(sbox_result) << endl;
+
+    // Permutacja P
+    uint32_t pbox_result = permute_P(sbox_result);
+    cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
+
+    // XOR z lewą częścią
+    uint32_t new_R = L ^ pbox_result;
+
+    // Zwracamy nowe części
+    return {R, new_R};
+}
+
+// void test_permutation() {
+//     uint64_t test_block = 0x0123456789ABCDEF;
+//     uint64_t permuted = apply_initial_permutation(test_block);
+//     // Spodziewany wynik dla testowego bloku
+//     uint64_t expected = 0x...; // Wynik po IP
+//     assert(permuted == expected && "Initial Permutation failed!");
+// }
+
 int main() {
     string input; // zmienna do trzymania wejścia z klawiatury
     cout << "Enter plain text: " << endl; 
-    getline(cin, input);
+    getline(cin, input); // wczytaj wejście
 
-    string key = generate_64bit_key();
-    cout << "Generated 64-bit key: " << key << endl;
+    string masterkey = generate_64bit_key();
+    cout << "Generated 64-bit key: " << masterkey << endl;
     // Save to file fo decrypt on remote host
     ofstream file;
     file.open("generated_key.txt");
-    file << key;
+    file << masterkey;
     file.close();
 
     cout << "Entry text: " << input << endl;
     cout << "Find blocks:" << endl;
 
-    for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
-        uint64_t block = text_to_hex(input, i);
-        cout << "Block " << i << ": ";
-        print_hex(block);
-        cout << "Block before and after initial permutation" << endl;
-        cout << bitset<64>(block) << endl; 
+    // for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
+    //     uint64_t block = text_to_hex(input, i);
+    //     //cout << "Block " << i << ": ";
+    //     print_hex(block);
+    //     //cout << "Block before and after initial permutation" << endl;
+    //     //cout << bitset<64>(block) << endl; 
 
-        uint64_t perm = apply_initial_permutation(block);
-        cout << bitset<64>(perm) << endl;
-        cout << "---------------------------------------" << endl;
+    //     uint64_t perm = apply_initial_permutation(block);
+    //     //cout << bitset<64>(perm) << setfill('0') << endl;
+    //     //cout << setw(16) << setfill('0') << hex << block << endl;
+    //     print_hex(perm);
+    //     cout << "---------------------------------------" << endl;
+    // }
 
+std::vector<uint64_t> blocks;
+for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
+    uint64_t block = text_to_hex(input, i);
+    print_hex(block);
+
+    uint64_t perm = apply_initial_permutation(block);
+    print_hex(perm);
+    cout << "---------------------------------------" << endl;
+
+    blocks.push_back(block);
+
+// Praca z podziałem na L i R dla każdego bloku
+for (size_t i = 0; i < blocks.size(); ++i) {
+    uint64_t block = blocks[i];
+    uint32_t L = static_cast<uint32_t>(block >> 32);
+    uint32_t R = static_cast<uint32_t>(block & 0xFFFFFFFF);
+    cout << "Block " << i << " - L: " << hex << L << ", R: " << hex << R << endl;
     }
+}
+
+
 
 // TEST
 
