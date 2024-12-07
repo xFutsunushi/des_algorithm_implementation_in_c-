@@ -158,7 +158,6 @@ const int SHIFT_SCHEDULE[16] = {
     2, 2, 2, 1
 };
 
-
 string generate_64bit_key() {
     // Używamy generatora liczb losowych
     random_device rd;
@@ -174,7 +173,7 @@ string generate_64bit_key() {
     return ss.str();
 }
 
-uint64_t text_to_hex(const std::string &text, size_t block_index) {
+uint64_t text_to_hex(const string &text, size_t block_index) {
     uint64_t block = 0;
     size_t index = block_index * 8;
     // Sprawdzamy, czy mamy wystarczająco znaków
@@ -204,29 +203,6 @@ uint64_t permute(uint64_t input, const int *permutation_table, size_t output_siz
     return output;
 }
 
-// Funkcja do generowania kluczy rundy
-vector<uint64_t> generate_round_keys(uint64_t master_key) {
-    vector<uint64_t> round_keys;
-
-    // Klucz główny jest dzielony na Lewą i Prawą część (28 bitów każda, uproszczenie)
-    uint32_t C = (master_key >> 28) & 0xFFFFFFF; // Lewa połowa klucza (28 bitów)
-    uint32_t D = master_key & 0xFFFFFFF;        // Prawa połowa klucza (28 bitów)
-
-    for (int round = 0; round < 16; ++round) {
-        // Przesunięcie w lewo (round + 1 to przykładowa logika przesunięcia)
-        int shifts = (round % 2 == 0) ? 1 : 2;
-        C = ((C << shifts) | (C >> (28 - shifts))) & 0xFFFFFFF;
-        D = ((D << shifts) | (D >> (28 - shifts))) & 0xFFFFFFF;
-
-        // Połączenie C i D, kompresja do 48 bitów za pomocą PC2
-        uint64_t combined = (static_cast<uint64_t>(C) << 28) | D;
-        uint64_t round_key = permute(combined, PC2, 48); // Permutacja kompresji
-        round_keys.push_back(round_key);
-    }
-
-    return round_keys;
-}
-
 // Funkcja ekspansji (E)
 uint64_t expand(uint32_t R) {
     return permute(static_cast<uint64_t>(R) << 32, E, 48); // R zamieniamy na 64-bitowy
@@ -252,11 +228,11 @@ vector<bitset<48>> generate_round_keys(const string& masterkey) {
     bitset<64> key = string_to_bitset(masterkey);
 
     // Permutacja początkowa (Initial Permutation)
-    const int initial_permutation[] = { /* Permutation table (IP) dla DES */ };
+    const int initial_permutation[] = { *IP };
     bitset<56> permuted_key = apply_permutation(key, initial_permutation);
 
     // Podział na dwie części 28-bitowe
-    bitset<28> left = permuted_key.to_ulong() >> 28;
+    bitset<28> left = permuted_key.to_ulong() >> 28; // returns an unsigned long integer representation of the data 
     bitset<28> right = permuted_key.to_ulong() & 0x0FFFFFFF;
 
     vector<bitset<48>> round_keys;
@@ -271,7 +247,8 @@ vector<bitset<48>> generate_round_keys(const string& masterkey) {
         bitset<56> combined_key = (left.to_ulong() << 28) | right.to_ulong();
 
         // Permutacja finalna (P) dla klucza rundy
-        const int round_key_permutation[] = { /* Permutation table (PC-2) */ };
+        //const int round_key_permutation[] = { /* Permutation table (PC-2) */ };
+        const int round_key_permutation[] = { *PC2 };
         round_keys.push_back(apply_permutation(combined_key, round_key_permutation));
     }
 
@@ -337,7 +314,7 @@ int main() {
     // cout << "Entry text: " << input << endl;
     // cout << "Find blocks:" << endl;
 
-std::vector<uint64_t> blocks;
+vector<uint64_t> blocks;
 for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
     uint64_t block = text_to_hex(input, i);
     print_hex(block);
