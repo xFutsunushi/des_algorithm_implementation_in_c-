@@ -186,13 +186,29 @@ void print_hex(uint64_t block) {
     cout << ss.str() << endl;
 }
 
+// // Funkcja permutacji ogólnej - przed zmianami
+// uint64_t initial_permute(uint64_t input, const int *permutation_table, size_t output_size) {
+//     uint64_t output = 0;
+//     cout << "Input: " << bitset<64>(input) << std::endl;
+//     for (size_t i = 0; i < output_size; ++i) {
+//         size_t bit_position = permutation_table[i] - 1;
+//         output |= ((input >> (63 - bit_position)) & 1) << (output_size - 1 - i);
+//     }
+//     return output;
+// }
+
 // Funkcja permutacji ogólnej
-uint64_t permute(uint64_t input, const int *permutation_table, size_t output_size) {
+uint64_t initial_permute(uint64_t input, const int *permutation_table, size_t output_size) {
     uint64_t output = 0;
+    cout << "Input: " << bitset<64>(input) << endl;
     for (size_t i = 0; i < output_size; ++i) {
         size_t bit_position = permutation_table[i] - 1;
-        output |= ((input >> (63 - bit_position)) & 1) << (output_size - 1 - i);
+        uint64_t bit = (input >> (63 - bit_position)) & 1;
+        output |= bit << (output_size - 1 - i);
+        cout << "Bit " << i << ": from position " << bit_position
+                  << " -> " << bit << ", Output: " << bitset<64>(output) << endl;
     }
+    cout << "Permuted Output: " << bitset<64>(output) << endl;
     return output;
 }
 
@@ -206,7 +222,7 @@ bitset<64> string_to_bitset(const string& str) {
 }
 
 template <size_t N, size_t M>
-bitset<M> apply_permutation(const bitset<N>& input, const std::array<int, M>& permutation_table) {
+bitset<M> apply_permutation(const bitset<N>& input, const array<int, M>& permutation_table) {
     bitset<M> output;
     for (size_t i = 0; i < M; ++i) {
         output[M - 1 - i] = input[N - permutation_table[i]];
@@ -302,7 +318,7 @@ for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
     uint64_t block = text_to_hex(input, i);
     cout << "Before initial permutation: " << endl;
     print_hex(block);
-    uint64_t perm = permute(block, IP.data(), 64);
+    uint64_t perm = initial_permute(block, IP.data(), 64);
 
     blocks.push_back(perm);
     cout << "After initial permutation: " << perm << endl;
