@@ -14,12 +14,13 @@ Author: Łukasz Świeżak
 #include <sstream>
 #include <vector>
 #include <cassert>
+#include <array>
 
 using namespace std;
 
 // TABLICE PERMUTACJI 
 // Permutacja początkowa  ( Initial permutation )
-const int IP[64] = {
+const array<int, 64> IP = {
     58, 50, 42, 34, 26, 18, 10, 2,
     60, 52, 44, 36, 28, 20, 12, 4,
     62, 54, 46, 38, 30, 22, 14, 6,
@@ -31,7 +32,7 @@ const int IP[64] = {
 };
 
 // Permutacja końcowa  ( Final permutation )
-const int FP[64] = {
+const array<int, 64> FP = {
     40, 8, 48, 16, 56, 24, 64, 32,
     39, 7, 47, 15, 55, 23, 63, 31,
     38, 6, 46, 14, 54, 22, 62, 30,
@@ -43,7 +44,7 @@ const int FP[64] = {
 };
 
 // Rozszerzenie ( Expansion Table - E )
-const int E[48] = {
+const array<int, 48> E = {
     32, 1,  2,  3,  4,  5,
     4,  5,  6,  7,  8,  9,
     8,  9,  10, 11, 12, 13,
@@ -55,7 +56,7 @@ const int E[48] = {
 };
 
 // Permutacja P
-const int P[32] = {
+const array<int, 32> P = {
     16, 7,  20, 21,
     29, 12, 28, 17,
     1,  15, 23, 26,
@@ -127,7 +128,7 @@ const int S[8][4][16] = {
 };
 
 // Permutacja klucza (PC1)
-const int PC1[56] = {
+const array<int, 56> PC1 = {
     57, 49, 41, 33, 25, 17, 9,
     1,  58, 50, 42, 34, 26, 18,
     10, 2,  59, 51, 43, 35, 27,
@@ -139,7 +140,7 @@ const int PC1[56] = {
 };
 
 // Permutacja klucza (PC2)
-const int PC2[48] = {
+const array<int, 48> PC2 = {
     14, 17, 11, 24, 1,  5,
     3,  28, 15, 6,  21, 10,
     23, 19, 12, 4,  26, 8,
@@ -148,14 +149,6 @@ const int PC2[48] = {
     30, 40, 51, 45, 33, 48,
     44, 49, 39, 56, 34, 53,
     46, 42, 50, 36, 29, 32
-};
-
-// Przesunięcie klucza (Key Shifts)
-const int SHIFT_SCHEDULE[16] = {
-    1, 1, 2, 2,
-    2, 2, 2, 2,
-    1, 2, 2, 2,
-    2, 2, 2, 1
 };
 
 string generate_64bit_key() {
@@ -203,16 +196,6 @@ uint64_t permute(uint64_t input, const int *permutation_table, size_t output_siz
     return output;
 }
 
-// Funkcja ekspansji (E)
-uint64_t expand(uint32_t R) {
-    return permute(static_cast<uint64_t>(R) << 32, E, 48); // R zamieniamy na 64-bitowy
-}
-
-// Funkcja permutacji P
-uint32_t permute_P(uint32_t input) {
-    return permute(static_cast<uint64_t>(input) << 32, P, 32);
-}
-
 // Funkcja pomocnicza do konwersji 64-bitowego klucza do bitów
 bitset<64> string_to_bitset(const string& str) {
     bitset<64> result;
@@ -222,42 +205,41 @@ bitset<64> string_to_bitset(const string& str) {
     return result;
 }
 
-// Funkcja do generowania kluczy rundy (16 kluczy)
-vector<bitset<48>> generate_round_keys(const string& masterkey) {
-    // Konwersja masterkey na bitset 64-bitowy
-    bitset<64> key = string_to_bitset(masterkey);
-
-    // Permutacja początkowa (Initial Permutation)
-    const int initial_permutation[] = { *IP };
-    bitset<56> permuted_key = apply_permutation(key, initial_permutation);
-
-    // Podział na dwie części 28-bitowe
-    bitset<28> left = permuted_key.to_ulong() >> 28; // returns an unsigned long integer representation of the data 
-    bitset<28> right = permuted_key.to_ulong() & 0x0FFFFFFF;
-
-    vector<bitset<48>> round_keys;
-
-    // Generowanie 16 kluczy rundy
-    for (int round = 0; round < 16; ++round) {
-        // Rotacja obu części
-        left = rotate_left(left, 1);
-        right = rotate_left(right, 1);
-
-        // Połączenie obu części
-        bitset<56> combined_key = (left.to_ulong() << 28) | right.to_ulong();
-
-        // Permutacja finalna (P) dla klucza rundy
-        //const int round_key_permutation[] = { /* Permutation table (PC-2) */ };
-        const int round_key_permutation[] = { *PC2 };
-        round_keys.push_back(apply_permutation(combined_key, round_key_permutation));
+template <size_t N, size_t M>
+bitset<M> apply_permutation(const bitset<N>& input, const std::array<int, M>& permutation_table) {
+    bitset<M> output;
+    for (size_t i = 0; i < M; ++i) {
+        output[M - 1 - i] = input[N - permutation_table[i]];
     }
-
-    return round_keys;
+    return output;
 }
 
 // Funkcja pomocnicza do rotacji w lewo
 bitset<28> rotate_left(bitset<28>& part, int n) {
     return (part << n) | (part >> (28 - n));
+}
+
+vector<bitset<48>> generate_round_keys(const string& masterkey) {
+    bitset<64> key = string_to_bitset(masterkey);
+
+    const int shifts[] = { 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1 };
+
+    bitset<56> permuted_key = apply_permutation(key, PC1);
+    bitset<28> left = permuted_key.to_ulong() >> 28;
+    bitset<28> right = permuted_key.to_ulong() & 0x0FFFFFFF;
+
+    vector<bitset<48>> round_keys;
+
+    for (int round = 0; round < 16; ++round) {
+        left = rotate_left(left, shifts[round]);
+        right = rotate_left(right, shifts[round]);
+
+        bitset<56> combined_key = (left.to_ulong() << 28) | right.to_ulong();
+        bitset<48> round_key = apply_permutation<56, 48>(combined_key, PC2);
+        round_keys.push_back(round_key);
+    }
+
+    return round_keys;
 }
 
 // Funkcja pomocnicza do permutacji
@@ -269,33 +251,34 @@ bitset<56> apply_permutation(const bitset<64>& input, const int* perm_table) {
     return result;
 }
 
-// Funkcja rundy Feistela
-pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
-    cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+
+// // Funkcja rundy Feistela
+// pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
+//     cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
     
-    // Ekspansja Prawa część (R) na 48 bitów
-    uint64_t expanded_R = expand(R);
-    cout << "Rozszerzone R: " << bitset<48>(expanded_R) << endl;
+//     // Ekspansja Prawa część (R) na 48 bitów
+//     uint64_t expanded_R = expand(R);
+//     cout << "Rozszerzone R: " << bitset<48>(expanded_R) << endl;
 
-    // XOR z kluczem rundy
-    uint64_t xor_result = expanded_R ^ round_key;
-    cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
+//     // XOR z kluczem rundy
+//     uint64_t xor_result = expanded_R ^ round_key;
+//     cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
 
-    // S-Boxy (brak pełnej implementacji S-Boxów — wynik bezpośrednio kopiowany)
-    // Zakładamy uproszczony wynik (pierwsze 32 bity XOR wyników)
-    uint32_t sbox_result = static_cast<uint32_t>((xor_result >> 16) ^ xor_result); // Placeholder
-    cout << "Wynik S-Boxów: " << bitset<32>(sbox_result) << endl;
+//     // S-Boxy (brak pełnej implementacji S-Boxów — wynik bezpośrednio kopiowany)
+//     // Zakładamy uproszczony wynik (pierwsze 32 bity XOR wyników)
+//     uint32_t sbox_result = static_cast<uint32_t>((xor_result >> 16) ^ xor_result); // Placeholder
+//     cout << "Wynik S-Boxów: " << bitset<32>(sbox_result) << endl;
 
-    // Permutacja P
-    uint32_t pbox_result = permute_P(sbox_result);
-    cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
+//     // Permutacja P
+//     uint32_t pbox_result = permute_P(sbox_result);
+//     cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
 
-    // XOR z lewą częścią
-    uint32_t new_R = L ^ pbox_result;
+//     // XOR z lewą częścią
+//     uint32_t new_R = L ^ pbox_result;
 
-    // Zwracamy nowe części
-    return {R, new_R};
-}
+//     // Zwracamy nowe części
+//     return {R, new_R};
+// }
 
 int main() {
     string input; // zmienna do trzymania wejścia z klawiatury
@@ -317,22 +300,29 @@ int main() {
 vector<uint64_t> blocks;
 for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
     uint64_t block = text_to_hex(input, i);
+    cout << "Before initial permutation: " << endl;
     print_hex(block);
+    uint64_t perm = permute(block, IP.data(), 64);
 
-    //uint64_t perm = apply_initial_permutation(block);
-    uint64_t perm = permute(block, IP, 64);
-    //print_hex(perm);
-    //cout << "---------------------------------------" << endl;
-
-    blocks.push_back(block);
+    blocks.push_back(perm);
+    cout << "After initial permutation: " << perm << endl;
 
 // Praca z podziałem na L i R dla każdego bloku
-for (size_t i = 0; i < blocks.size(); ++i) {
-    uint64_t block = blocks[i];
-    uint32_t L = static_cast<uint32_t>(block >> 32);
-    uint32_t R = static_cast<uint32_t>(block & 0xFFFFFFFF);
-    cout << "Block " << i << " - L: " << hex << L << ", R: " << hex << R << endl;
-    }
+// for (size_t i = 0; i < blocks.size(); ++i) {
+//     uint64_t block = blocks[i];
+//     uint32_t L = static_cast<uint32_t>(block >> 32);
+//     uint32_t R = static_cast<uint32_t>(block & 0xFFFFFFFF);
+//     cout << "Block " << i << " - L: " << hex << L << ", R: " << hex << R << endl;
+//     }
 }
+
+    vector<bitset<48>> keys = generate_round_keys(masterkey);
+
+    // // Możesz też przejść po wektorze i wypisać klucze jeszcze raz
+    // for (size_t i = 0; i < keys.size(); ++i) {
+    //     cout << "Round: " << (i + 1) << ": " << keys[i].to_string() << endl;
+    // }
     return 0;
 }
+
+// Your lips are smoother than vaseline
