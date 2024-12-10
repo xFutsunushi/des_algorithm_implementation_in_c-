@@ -204,6 +204,16 @@ void print_hex(uint64_t block) {
     cout << ss.str() << endl;
 }
 
+// Funkcja permutacji P
+uint32_t permute_P(uint32_t sbox_result) {
+    uint32_t pbox_result = 0;
+    for (int i = 0; i < 32; ++i) {
+        int bit_position = P[i] - 1;  // Indeksowanie od 1 w permutacji
+        pbox_result |= ((sbox_result >> bit_position) & 1) << (31 - i);  // Ustawiamy bity zgodnie z permutacją
+    }
+    return pbox_result;
+}
+
 // Funkcja permutacji ogólnej
 uint64_t initial_permute(uint64_t input, const int *permutation_table, size_t output_size) {
     uint64_t output = 0;
@@ -249,14 +259,18 @@ void splitBlock(const bitset<64>& input, bitset<32>& left, bitset<32>& right) {
     }
 }
 
-// // Funkcja rozszerzenia (E) 32 bity -> 48 bitów
-// bitset<48> expand(const bitset<32>& R) {
-//     bitset<48> expandedR;
-//     for (int i = 0; i < 48; ++i) {
-//         expandedR[i] = R[E[i] - 1];  // Indeksowanie od 1 w permutacji
-//     }
-//     return expandedR;
-// }
+// Funkcja rozszerzenia
+uint64_t expand(uint32_t R) {
+    uint64_t expanded_R = 0;
+
+    for (int i = 0; i < 48; ++i) {
+        int bit_position = E[i] - 1;  // Indeksowanie od 1 w tabeli
+        uint64_t bit = (R >> bit_position) & 1;  // Pobranie odpowiedniego bitu z R
+        expanded_R |= (bit << (47 - i));  // Ustawienie bitu w odpowiedniej pozycji
+    }
+
+    return expanded_R;
+}
 
 template <size_t N, size_t M>
 bitset<M> apply_permutation(const bitset<N>& input, const array<int, M>& permutation_table) {
@@ -307,33 +321,33 @@ vector<bitset<48>> generate_round_keys(const bitset<64>& key) {
     return round_keys;
 }
 
-// // Funkcja rundy Feistela
-// pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
-//     cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+// Funkcja rundy Feistela
+pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
+    cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
     
-//     // Ekspansja Prawa część (R) na 48 bitów
-//     uint64_t expanded_R = expand(R);
-//     cout << "Rozszerzone R: " << bitset<48>(expanded_R) << endl;
+    // Ekspansja Prawa część (R) na 48 bitów
+    uint64_t expanded_R = expand(R);
+    cout << "Rozszerzone R: " << bitset<48>(expanded_R) << endl;
 
-//     // XOR z kluczem rundy
-//     uint64_t xor_result = expanded_R ^ round_key;
-//     cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
+    // XOR z kluczem rundy
+    uint64_t xor_result = expanded_R ^ round_key;
+    cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
 
-//     // S-Boxy (brak pełnej implementacji S-Boxów — wynik bezpośrednio kopiowany)
-//     // Zakładamy uproszczony wynik (pierwsze 32 bity XOR wyników)
-//     uint32_t sbox_result = static_cast<uint32_t>((xor_result >> 16) ^ xor_result); // Placeholder
-//     cout << "Wynik S-Boxów: " << bitset<32>(sbox_result) << endl;
+    // S-Boxy (brak pełnej implementacji S-Boxów — wynik bezpośrednio kopiowany)
+    // Zakładamy uproszczony wynik (pierwsze 32 bity XOR wyników)
+    uint32_t sbox_result = static_cast<uint32_t>((xor_result >> 16) ^ xor_result); // Placeholder
+    cout << "Wynik S-Boxów: " << bitset<32>(sbox_result) << endl;
 
-//     // Permutacja P
-//     uint32_t pbox_result = permute_P(sbox_result);
-//     cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
+    // Permutacja P
+    uint32_t pbox_result = permute_P(sbox_result);
+    cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
 
-//     // XOR z lewą częścią
-//     uint32_t new_R = L ^ pbox_result;
+    // XOR z lewą częścią
+    uint32_t new_R = L ^ pbox_result;
 
-//     // Zwracamy nowe części
-//     return {R, new_R};
-// }
+    // Zwracamy nowe części
+    return {R, new_R};
+}
 
 int main() {
     string input = "Your lips are smoother than vaseline" ; // zmienna do trzymania wejścia z klawiatury
