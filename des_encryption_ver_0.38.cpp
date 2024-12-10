@@ -151,6 +151,24 @@ const array<int, 48> PC2 = {
     46, 42, 50, 36, 29, 32
 };
 
+// Przesunięcie w lewo (liczba bitów) dla każdej rundy
+const int shiftTable[16] = {1, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1, 2, 1};
+
+// Funkcja do konwersji tekstu na uint64_t
+vector<uint64_t> stringToUint64(const string& input) {
+    vector<uint64_t> result;
+    size_t len = input.length();
+    
+    for (size_t i = 0; i < len; i += 8) {
+        uint64_t chunk = 0;
+        for (size_t j = 0; j < 8 && (i + j) < len; ++j) {
+            chunk |= (static_cast<uint64_t>(input[i + j]) << (56 - 8 * j));
+        }
+        result.push_back(chunk);
+    }
+    return result;
+}
+
 string generate_64bit_key() {
     // Używamy generatora liczb losowych
     random_device rd;
@@ -186,29 +204,20 @@ void print_hex(uint64_t block) {
     cout << ss.str() << endl;
 }
 
-// // Funkcja permutacji ogólnej - przed zmianami
-// uint64_t initial_permute(uint64_t input, const int *permutation_table, size_t output_size) {
-//     uint64_t output = 0;
-//     cout << "Input: " << bitset<64>(input) << std::endl;
-//     for (size_t i = 0; i < output_size; ++i) {
-//         size_t bit_position = permutation_table[i] - 1;
-//         output |= ((input >> (63 - bit_position)) & 1) << (output_size - 1 - i);
-//     }
-//     return output;
-// }
-
 // Funkcja permutacji ogólnej
 uint64_t initial_permute(uint64_t input, const int *permutation_table, size_t output_size) {
     uint64_t output = 0;
-    cout << "Input: " << bitset<64>(input) << endl;
+    //cout << "Input: " << bitset<64>(input) << " (" << hex << uppercase << input << ")" << endl;
     for (size_t i = 0; i < output_size; ++i) {
         size_t bit_position = permutation_table[i] - 1;
         uint64_t bit = (input >> (63 - bit_position)) & 1;
         output |= bit << (output_size - 1 - i);
-        cout << "Bit " << i << ": from position " << bit_position
-                  << " -> " << bit << ", Output: " << bitset<64>(output) << endl;
+        // cout << "Bit " << i << ": from position " << bit_position
+        //           << " -> " << bit << ", Output: "
+        //           << bitset<64>(output) << " (0x" << hex << uppercase << output << ")" << endl;
     }
-    cout << "Permuted Output: " << bitset<64>(output) << endl;
+    //cout << "Permuted Output: " << bitset<64>(output)
+    //          << " (0x" << hex << uppercase << output << ")" << endl;
     return output;
 }
 
@@ -220,6 +229,34 @@ bitset<64> string_to_bitset(const string& str) {
     }
     return result;
 }
+
+bitset<64> stringToBitset64(const string& input) {
+    bitset<64> result;
+    // Konwertowanie każdego znaku do odpowiedniego segmentu bitów
+    for (size_t i = 0; i < input.length(); ++i) {
+        for (size_t j = 0; j < 8; ++j) {
+            result[i * 8 + j] = (input[i] >> (7 - j)) & 1;
+        }
+    }
+    return result;
+}
+
+// Funkcja dzieląca 64-bitowy blok na lewą (L) i prawą (R) część (po 32 bity każda)
+void splitBlock(const bitset<64>& input, bitset<32>& left, bitset<32>& right) {
+    for (int i = 0; i < 32; ++i) {
+        left[i] = input[63 - i];  // Lewa część: pierwsze 32 bity
+        right[i] = input[31 - i]; // Prawa część: kolejne 32 bity
+    }
+}
+
+// // Funkcja rozszerzenia (E) 32 bity -> 48 bitów
+// bitset<48> expand(const bitset<32>& R) {
+//     bitset<48> expandedR;
+//     for (int i = 0; i < 48; ++i) {
+//         expandedR[i] = R[E[i] - 1];  // Indeksowanie od 1 w permutacji
+//     }
+//     return expandedR;
+// }
 
 template <size_t N, size_t M>
 bitset<M> apply_permutation(const bitset<N>& input, const array<int, M>& permutation_table) {
@@ -235,38 +272,40 @@ bitset<28> rotate_left(bitset<28>& part, int n) {
     return (part << n) | (part >> (28 - n));
 }
 
-vector<bitset<48>> generate_round_keys(const string& masterkey) {
-    bitset<64> key = string_to_bitset(masterkey);
-
-    const int shifts[] = { 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1 };
-
-    bitset<56> permuted_key = apply_permutation(key, PC1);
-    bitset<28> left = permuted_key.to_ulong() >> 28;
-    bitset<28> right = permuted_key.to_ulong() & 0x0FFFFFFF;
-
+// Funkcja generująca klucze rundowe
+vector<bitset<48>> generate_round_keys(const bitset<64>& key) {
+    // Klucze rundowe
     vector<bitset<48>> round_keys;
+    
+    // Krok 1: Permutacja początkowa (PC-1)
+    bitset<56> permuted_key = apply_permutation(key, PC1);
+    //cout << permuted_key << endl; 
 
+    // Podziel klucz na dwie części (28 bitów każda)
+    bitset<28> left = permuted_key.to_ulong() >> 28;  // Pierwsze 28 bitów
+    bitset<28> right = permuted_key.to_ulong() & 0x0FFFFFFF;  // Pozostałe 28 bitów
+
+    //cout << "Jest ok, miele dalej >>>> " << endl; 
+
+    // Krok 2: Generowanie kluczy rundowych
     for (int round = 0; round < 16; ++round) {
-        left = rotate_left(left, shifts[round]);
-        right = rotate_left(right, shifts[round]);
+        // Przesunięcie obu części
+        left = (left << shiftTable[round]) | (left >> (28 - shiftTable[round]));
+        right = (right << shiftTable[round]) | (right >> (28 - shiftTable[round]));
 
-        bitset<56> combined_key = (left.to_ulong() << 28) | right.to_ulong();
-        bitset<48> round_key = apply_permutation<56, 48>(combined_key, PC2);
-        round_keys.push_back(round_key);
+        // Połączenie obu części w jeden bitset<56>
+        bitset<56> combined_key;
+        for (int i = 0; i < 28; ++i) {
+            combined_key[i] = left[i];  // Dodaj lewą część
+            combined_key[28 + i] = right[i];  // Dodaj prawą część
+        }
+
+        // Zastosuj permutację końcową (PC-2) do połączonego klucza
+        round_keys.push_back(apply_permutation(combined_key, PC2));
     }
 
     return round_keys;
 }
-
-// Funkcja pomocnicza do permutacji
-bitset<56> apply_permutation(const bitset<64>& input, const int* perm_table) {
-    bitset<56> result;
-    for (int i = 0; i < 56; ++i) {
-        result[i] = input[perm_table[i] - 1]; // Indeksowanie od 1
-    }
-    return result;
-}
-
 
 // // Funkcja rundy Feistela
 // pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
@@ -297,9 +336,9 @@ bitset<56> apply_permutation(const bitset<64>& input, const int* perm_table) {
 // }
 
 int main() {
-    string input; // zmienna do trzymania wejścia z klawiatury
-    cout << "Enter plain text: " << endl; 
-    getline(cin, input); // wczytaj wejście
+    string input = "Your lips are smoother than vaseline" ; // zmienna do trzymania wejścia z klawiatury
+    //cout << "Enter plain text: " << endl; 
+    //getline(cin, input); // wczytaj wejście
 
     string masterkey = generate_64bit_key();
     cout << "Generated 64-bit key: " << masterkey << endl;
@@ -310,34 +349,30 @@ int main() {
     file << masterkey;
     file.close();
 
-    // cout << "Entry text: " << input << endl;
-    // cout << "Find blocks:" << endl;
+    vector<uint64_t> input_in_uint64 = stringToUint64(input);
 
-vector<uint64_t> blocks;
-for (size_t i = 0; i < (input.size() + 7) / 8; ++i) {
-    uint64_t block = text_to_hex(input, i);
-    cout << "Before initial permutation: " << endl;
-    print_hex(block);
-    uint64_t perm = initial_permute(block, IP.data(), 64);
+    // Przeprowadzenie IP i podział na L i R
+    for (auto &block : input_in_uint64) {
+        cout << "Original block: " << hex << block << endl;
+        
+        // Przeprowadź permutację początkową (IP)
+        uint64_t permuted_block = initial_permute(block, IP.data(), 64);
+        cout << "After Initial Permutation: " << hex << permuted_block << endl;
+    }
 
-    blocks.push_back(perm);
-    cout << "After initial permutation: " << perm << endl;
+    bitset<64> masterkeyBitset = stringToBitset64(masterkey);
 
-// Praca z podziałem na L i R dla każdego bloku
-// for (size_t i = 0; i < blocks.size(); ++i) {
-//     uint64_t block = blocks[i];
-//     uint32_t L = static_cast<uint32_t>(block >> 32);
-//     uint32_t R = static_cast<uint32_t>(block & 0xFFFFFFFF);
-//     cout << "Block " << i << " - L: " << hex << L << ", R: " << hex << R << endl;
-//     }
-}
+    // Dla testów
+    //bitset<64> key("133457799BBCDFF1");
 
-    vector<bitset<48>> keys = generate_round_keys(masterkey);
+    vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
+    cout << "Master key in bits: " << masterkeyBitset << endl;
 
-    // // Możesz też przejść po wektorze i wypisać klucze jeszcze raz
-    // for (size_t i = 0; i < keys.size(); ++i) {
-    //     cout << "Round: " << (i + 1) << ": " << keys[i].to_string() << endl;
-    // }
+    // Wyświetlanie kluczy rundowych
+    for (int i = 0; i < round_keys.size(); ++i) {
+        cout << "Round " << i + 1 << " key: " << round_keys[i] << endl;
+    }
+
     return 0;
 }
 
