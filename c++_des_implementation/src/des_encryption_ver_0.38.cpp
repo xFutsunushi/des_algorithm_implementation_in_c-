@@ -513,11 +513,11 @@ int main() {
 
     // Podziel bloki na lewą i prawą stronę 
     for (const auto &[L, R] : split_blocks) {
-    cout << "L: " << bitset<32>(L) << ", R: " << bitset<32>(R) << endl;
+    //cout << "L: " << bitset<32>(L) << ", R: " << bitset<32>(R) << endl;
     }
 
     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
-    cout << "Master key in bits: " << masterkeyBitset << endl;
+    //out << "Master key in bits: " << masterkeyBitset << endl;
     save_round_keys(round_keys, "roundkeys.bin");
 
     // // Wyświetlanie kluczy rundowych
@@ -527,20 +527,20 @@ int main() {
 
     // Przetwarzanie każdego bloku przez 16 rund Feistela
     for (auto &[L, R] : split_blocks) {
-        cout << "Processing block: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+        //cout << "Processing block: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
 
         for (int i = 0; i < 16; ++i) {
             uint64_t round_key = round_keys[i].to_ullong(); // Konwersja klucza na uint64_t
-            cout << "Round " << i + 1 << " with key: " << bitset<48>(round_key) << endl;
+            //cout << "Round " << i + 1 << " with key: " << bitset<48>(round_key) << endl;
             tie(L, R) = feistel_round(L, R, round_key); // Wykonanie rundy Feistela
-            cout << "After round " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+            //cout << "After round " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
         }
 
         // Zamiana miejsc po 16 rundach
         swap(L, R);
 
         // Wyświetlenie końcowego wyniku bloku
-        cout << "Block after 16 rounds: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+        //cout << "Block after 16 rounds: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
     }
 
     // Połączenie bloków
