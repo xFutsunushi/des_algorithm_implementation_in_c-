@@ -517,7 +517,7 @@ int main() {
     }
 
     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
-    //out << "Master key in bits: " << masterkeyBitset << endl;
+    cout << "Master key in bits: " << masterkeyBitset << endl;
     save_round_keys(round_keys, "roundkeys.bin");
 
     // // Wyświetlanie kluczy rundowych
@@ -531,9 +531,9 @@ int main() {
 
         for (int i = 0; i < 16; ++i) {
             uint64_t round_key = round_keys[i].to_ullong(); // Konwersja klucza na uint64_t
-            //cout << "Round " << i + 1 << " with key: " << bitset<48>(round_key) << endl;
+            cout << "Round " << i + 1 << " with key: " << bitset<48>(round_key) << endl;
             tie(L, R) = feistel_round(L, R, round_key); // Wykonanie rundy Feistela
-            //cout << "After round " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+            cout << "After round " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
         }
 
         // Zamiana miejsc po 16 rundach
@@ -557,31 +557,40 @@ int main() {
         cout << "Output w hex: " << hex << block << endl;
     }
 
-    // // DESZYFROWANIE 
-    // vector<bitset<48>> loaded_round_keys;
-    // load_round_keys(loaded_round_keys, "roundkeys.bin");
+    // DESZYFROWANIE 
+    vector<bitset<48>> loaded_round_keys;
+    load_round_keys(loaded_round_keys, "roundkeys.bin");
 
-    // vector<pair<uint32_t, uint32_t>> decrypted_blocks;
-    // for (const auto &block : processed_blocks) {
-    //     uint32_t L = static_cast<uint32_t>(block >> 32); // Wyciągamy lewy 32-bitowy fragment
-    //     uint32_t R = static_cast<uint32_t>(block & 0xFFFFFFFF); // Wyciągamy prawy 32-bitowy fragment
-    //     decrypted_blocks.push_back({L, R});
-    // }
+    vector<pair<uint32_t, uint32_t>> decrypted_blocks;
+    for (const auto &block : processed_blocks) {
+        uint32_t L = static_cast<uint32_t>(block >> 32); // Wyciągamy lewy 32-bitowy fragment
+        uint32_t R = static_cast<uint32_t>(block & 0xFFFFFFFF); // Wyciągamy prawy 32-bitowy fragment
+        decrypted_blocks.push_back({L, R});
+    }
 
-    // cout << "Decrypted blocks:" << endl;
-    // for (const auto &[L, R] : decrypted_blocks) {
-    //     cout << "L: " << hex << L << " R: " << hex << R << endl;
-    // }
+    cout << "Decrypted blocks:" << endl;
+    for (const auto &[L, R] : decrypted_blocks) {
+        cout << "L: " << hex << L << " R: " << hex << R << endl;
+    }
+
+    // Tworzymy zmienną do przechowywania tekstu zaszyfrowanego jako string
+    string encrypted_text = "";
+
+    // Dla każdego bloku w processed_blocks konwertujemy go na binarny ciąg i dodajemy do encrypted_text
+    for (const auto &block : processed_blocks) {
+        encrypted_text += bitset<64>(block).to_string(); // Zamienia uint64_t na string (bitowy)
+    }
+
+    // Wyświetlamy wynik
+    cout << "Encrypted text (in binary): " << encrypted_text << endl;
     
-    // // 1. Wczytaj zaszyfrowany tekst (tutaj przykładowo zaszyfrowany tekst to ciąg binarny)
-    // string encrypted_text = block;
-    
-    // // 2. Przekształć zaszyfrowany tekst do uint64_t (jeśli jest w postaci binarnej)
-    // bitset<64> encrypted_bits(encrypted_text);  // Załóżmy, że encrypted_text to ciąg binarny
-    // uint64_t encrypted_block = encrypted_bits.to_ullong();
+    bitset<64> encrypted_bits(encrypted_text);  // Załóżmy, że encrypted_text to ciąg binarny
+    uint64_t encrypted_block = encrypted_bits.to_ullong();
 
+    vector<uint64_t> blocks = { processed_blocks[0] };  // Dodajemy pierwszy blok do wektora
+    
     // // 3. Rozpocznij deszyfrowanie
-    // decrypt_DES(round_keys, input_blocks);
+    decrypt_DES(loaded_round_keys, blocks);
 
     // // 4. Przekształć wynik na tekst (plain text)
     // string decrypted_text = binary(decrypted_bits); // Funkcja konwertująca bitset na string
