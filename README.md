@@ -55,8 +55,8 @@ string xorOperation(const string& r, const string& roundKey) {
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YourRepository.git
-   cd YourRepository
+   git clone https://github.com/xFutsunushi/des_algorithm_implementation_in_c-.git
+   cd des_algorithm_implementation_in_c-
    ```
 
 2. Build the project using the `g++` compiler:
