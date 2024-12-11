@@ -134,7 +134,7 @@ const array<int, 48> PC2 = {
 };
 
 // Przesunięcie w lewo (liczba bitów) dla każdej rundy
-const int shiftTable[16] = {1, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1, 2, 1};
+const int shiftTable[16] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
 
 // Tablica do odwrotnej permutacji
 array<int, 64> IP_inverse = {
