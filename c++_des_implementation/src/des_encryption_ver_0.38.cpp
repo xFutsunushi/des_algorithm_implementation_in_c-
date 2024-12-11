@@ -108,8 +108,8 @@ uint64_t initial_permute(uint64_t input, const int *permutation_table, size_t ou
         output |= bit << (output_size - 1 - i);
 
         // Wyświetlamy postęp
-        cout << "Bit " << i << ": from position " << permutation_table[i] << " -> " << bit
-             << ", Output: " << bitset<64>(output) << " (0x" << hex << uppercase << output << ")" << endl;
+        //cout << "Bit " << i << ": from position " << permutation_table[i] << " -> " << bit
+             //<< ", Output: " << bitset<64>(output) << " (0x" << hex << uppercase << output << ")" << endl;
     }
 
     cout << "Permuted Output: " << bitset<64>(output) << " (0x" << hex << uppercase << output << ")" << endl;
@@ -294,24 +294,24 @@ uint32_t apply_sboxes(uint64_t xor_result) {
 
 // Funkcja rundy Feistela
 pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
-    cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+    //cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
     
     // Ekspansja Prawa część (R) na 48 bitów
     uint64_t expanded_R = expand(R);
-    cout << "Rozszerzone R: " << bitset<48>(expanded_R) << endl;
+    //cout << "Rozszerzone R: " << bitset<48>(expanded_R) << endl;
 
     // XOR z kluczem rundy
     uint64_t xor_result = expanded_R ^ round_key;
-    cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
+    //cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
 
     uint32_t sbox_result = apply_sboxes(xor_result);
 
     // Wynik po S-Boxach
-    cout << "Wynik po S-Boxach: " << bitset<32>(sbox_result) << endl;
+    //cout << "Wynik po S-Boxach: " << bitset<32>(sbox_result) << endl;
 
     // Permutacja P
     uint32_t pbox_result = permute_P(sbox_result);
-    cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
+    //cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
 
     // XOR z lewą częścią
     uint32_t new_R = L ^ pbox_result;
@@ -320,65 +320,27 @@ pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_ke
     return {R, new_R};
 }
 
-// ######################################################
-// ##########      FUNKCJE DO ODSZYFROWANIA     #########
-// ######################################################
-
-// pair<uint32_t, uint32_t> feistel_round_decrypt(uint32_t L, uint32_t R, uint64_t round_key) {
-//     // Odwracamy proces rundy Feistela
-//     uint64_t expanded_R = expand(R);
-//     uint64_t xor_result = expanded_R ^ round_key;
-//     uint32_t sbox_result = apply_sboxes(xor_result);
-//     uint32_t pbox_result = permute_P(sbox_result);
-//     uint32_t new_R = L;  // R staje się nowym L
-//     uint32_t new_L = R ^ pbox_result; // Nowe L jest XOR starego R z wynikiem P-Box
-//     return {new_L, new_R};
-// }
-
-// void decrypt_DES(const vector<bitset<48>>& round_keys, const vector<uint64_t>& input_blocks) {
-//     // Klucze rundowe muszą być używane w odwrotnej kolejności dla deszyfrowania
-//     vector<bitset<48>> reverse_round_keys(round_keys.rbegin(), round_keys.rend());
-
-//     // Przetwarzanie każdego bloku
-//     for (const auto& block : input_blocks) {
-//         uint64_t permuted_block = initial_permute(block, IP.data(), 64); // Permutacja początkowa
-//         bitset<64> block_bits(permuted_block);
-
-//         // Podziel blok na dwie części: L i R
-//         uint32_t L = static_cast<uint32_t>(block_bits.to_ulong() >> 32); // Lewa część
-//         uint32_t R = static_cast<uint32_t>(block_bits.to_ulong() & 0xFFFFFFFF); // Prawa część
-
-//         // Przeprowadź rundy Feistela w odwrotnej kolejności kluczy
-//         for (int round = 0; round < 16; ++round) {
-//             auto [new_L, new_R] = feistel_round(L, R, reverse_round_keys[round].to_ullong());
-//             L = new_L;
-//             R = new_R;
-//         }
-
-//         // Po zakończeniu rund, łączymy L i R w odwrotnej kolejności
-//         uint64_t combined = (static_cast<uint64_t>(R) << 32) | L; // Połącz odwrócone części
-//         bitset<64> combined_bits(combined);
-
-        // // Zastosuj permutację końcową (IP⁻¹)
-        // bitset<64> final_block = apply_permutation<64, 64>(combined_bits, IP_inverse);
-
-//         cout << "Odszyfrowany blok: " << final_block << endl;
-//         cout << "Odszyfrowany blok w binarnej formie: " << bitset<64>(final_block) << endl;
-//         cout << "Odszyfrowany blok w hex: " << hex << final_block << endl;
-//     }
-// }
+uint64_t final_permutation(uint64_t input, const int* permutation_table) {
+    uint64_t output = 0;
+    for (size_t i = 0; i < 64; ++i) {
+        size_t bit_position = FP[i] - 1;
+        uint64_t bit = (input >> (63 - bit_position)) & 1;
+        output |= bit << (63 - i);  // Zapisz bit w odpowiedniej pozycji w wyniku
+    }
+    return output;
+}
 
 int main() {
-    //string input = "Your lips are smoother than vaseline" ; // zmienna do trzymania wejścia z klawiatury
+    string input = "596F7572206C6970" ; // zmienna do trzymania wejścia z klawiatury
     //string input = "596F7572206C6970 732061726520736D 6F6F746865722074 68616E2076617365 6C696E650D0A";
-    string input = "0123456789ABCDEF";
+    //string input = "8787878787878787";
 
     // Padding
     while (input.length() % 16 != 0) {
         input += "00"; // Padding 0s
     }
 
-    string hex_masterkey = "133457799BBCDFF1"; 
+    string hex_masterkey = "0E329232EA6D0D73"; 
     bitset<64> masterkeyBitset = stringToBitset64(hex_masterkey);
     vector<uint64_t> input_in_uint64 = stringToUint64(input);
 
@@ -408,80 +370,42 @@ int main() {
 
     // Podziel bloki na lewą i prawą stronę 
     for (const auto &[L, R] : split_blocks) {
-    cout << "L: " << bitset<32>(L) << ", R: " << bitset<32>(R) << endl;
+    //cout << "L: " << bitset<32>(L) << ", R: " << bitset<32>(R) << endl;
     }
 
     // Przetwarzanie każdego bloku przez 16 rund Feistela
     for (auto &[L, R] : split_blocks) {
-        cout << "Processing block: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+        //cout << "Przetwarzany blok: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
 
+        // Przeprowadzenie 16 rund Feistela
         for (int i = 0; i < 16; ++i) {
             uint64_t round_key = round_keys[i].to_ullong(); // Konwersja klucza na uint64_t
-            cout << "Round " << i + 1 << " with key: " << bitset<48>(round_key) << endl;
+            //cout << "Runda " << i + 1 << " z kluczem: " << bitset<48>(round_key) << endl;
+        
+            // Wywołanie rundy Feistela
             tie(L, R) = feistel_round(L, R, round_key); // Wykonanie rundy Feistela
-            cout << "After round " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
-        }
-
-        // Zamiana miejsc po 16 rundach
-        swap(L, R);
-
-        // Wyświetlenie końcowego wyniku bloku
-        cout << "Block after 16 rounds: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+            //cout << "Po rundzie " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
     }
 
-    // Połączenie bloków
-    vector<uint64_t> processed_blocks;
-    for (const auto &[L, R] : split_blocks) {
-        uint64_t processed_block = (static_cast<uint64_t>(L) << 32) | R;
-        processed_blocks.push_back(processed_block);
-    }
+    // Zamiana miejsc po 16 rundach
+    swap(L, R);
+    // Przechowanie wyniku po 16 rundach
+    uint32_t final_L = L;
+    uint32_t final_R = R;
 
-    // Wyświetlenie przetworzonych bloków
-    cout << "Processed blocks:" << endl;
-    for (const auto &block : processed_blocks) {
-        //cout << "Output w bitach: " << bitset<64>(block) << endl;
-        cout << "Output w hex: " << hex << block << endl;
-    }
+    //cout << "Po zamianie miejsc: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
 
-    // DESZYFROWANIE 
-    vector<bitset<48>> loaded_round_keys;
-    load_round_keys(loaded_round_keys, "roundkeys.bin");
+    // Wykonanie finalnej permutacji
+    uint64_t final_block = final_permutation((static_cast<uint64_t>(L) << 32) | R, FP.data());
+    //cout << "Blok po finalnej permutacji: " << bitset<64>(final_block) << endl;
 
-    vector<pair<uint32_t, uint32_t>> decrypted_blocks;
-    for (const auto &block : processed_blocks) {
-        uint32_t L = static_cast<uint32_t>(block >> 32); // Wyciągamy lewy 32-bitowy fragment
-        uint32_t R = static_cast<uint32_t>(block & 0xFFFFFFFF); // Wyciągamy prawy 32-bitowy fragment
-        decrypted_blocks.push_back({L, R});
-    }
+    // Wyświetlenie końcowego wyniku bloku
+    //cout << "Blok po 16 rundach i finalnej permutacji: " << bitset<64>(final_block) << " (" << hex << uppercase << final_block << ")" << endl;
 
-    //cout << "Decrypted blocks:" << endl;
-    //for (const auto &[L, R] : decrypted_blocks) {
-      // cout << "L: " << hex << L << " R: " << hex << R << endl;
-    //}
-
-    // Tworzymy zmienną do przechowywania tekstu zaszyfrowanego jako string
-    string encrypted_text = "";
-
-    // Dla każdego bloku w processed_blocks konwertujemy go na binarny ciąg i dodajemy do encrypted_text
-    for (const auto &block : processed_blocks) {
-        encrypted_text += bitset<64>(block).to_string(); // Zamienia uint64_t na string (bitowy)
-    }
-
-    // Wyświetlamy wynik
-    cout << "Encrypted text (in binary): " << encrypted_text << endl;
-    
-    bitset<64> encrypted_bits(encrypted_text);  // Załóżmy, że encrypted_text to ciąg binarny
-    uint64_t encrypted_block = encrypted_bits.to_ullong();
-
-    vector<uint64_t> blocks = { processed_blocks[0] };  // Dodajemy pierwszy blok do wektora
-    
-    // // 3. Rozpocznij deszyfrowanie
-    //decrypt_DES(loaded_round_keys, blocks);
-
-    // // 4. Przekształć wynik na tekst (plain text)
-    // string decrypted_text = binary(decrypted_bits); // Funkcja konwertująca bitset na string
-    // cout << "Decrypted text: " << decrypted_text << endl;
-
-
+        // Wyświetlanie wyników po wszystkich rundach
+    cout << "Final Block (after 16 rounds and final permutation): "
+         << "L = " << bitset<32>(final_L) << ", R = " << bitset<32>(final_R)
+         << ", Final block: " << bitset<64>(final_block) << " (Hex: " << hex << final_block << ")" << endl;
+}
     return 0;
 }
