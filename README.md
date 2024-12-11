@@ -29,8 +29,8 @@ Here is an example C++ code showing how to perform an XOR operation on the expan
 
 ```cpp
 // Example XOR function in C++
-std::string xorOperation(const std::string& r, const std::string& roundKey) {
-    std::string result;
+string xorOperation(const string& r, const string& roundKey) {
+    string result;
     for (size_t i = 0; i < r.length(); ++i) {
         result += (r[i] == roundKey[i] ? '0' : '1');  // XOR
     }
