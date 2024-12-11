@@ -68,7 +68,7 @@ const array<int, 32> P = {
 };
 
 // Tablice S-Box (Substitution Boxes)
-const int S[8][4][16] = {
+const int SBOX[8][4][16] = {
     // S1
     {
         {14, 4,  13, 1,  2,  15, 11, 8,  3,  10, 6,  12, 5,  9,  0,  7},
@@ -251,12 +251,14 @@ bitset<64> stringToBitset64(const string& input) {
     return result;
 }
 
-// Funkcja dzieląca 64-bitowy blok na lewą (L) i prawą (R) część (po 32 bity każda)
-void splitBlock(const bitset<64>& input, bitset<32>& left, bitset<32>& right) {
-    for (int i = 0; i < 32; ++i) {
-        left[i] = input[63 - i];  // Lewa część: pierwsze 32 bity
-        right[i] = input[31 - i]; // Prawa część: kolejne 32 bity
-    }
+// Funkcja do podziału 64-bitowego bloku na lewą i prawą część
+pair<uint32_t, uint32_t> splitBlock(uint64_t block) {
+    // Lewa połowa to pierwsze 32 bity (najbardziej znaczące)
+    uint32_t left = static_cast<uint32_t>(block >> 32);
+    // Prawa połowa to ostatnie 32 bity (najmniej znaczące)
+    uint32_t right = static_cast<uint32_t>(block & 0xFFFFFFFF);
+
+    return {left, right};
 }
 
 // Funkcja rozszerzenia
@@ -321,6 +323,28 @@ vector<bitset<48>> generate_round_keys(const bitset<64>& key) {
     return round_keys;
 }
 
+// Funkcja obsługująca S-Boxy
+uint32_t apply_sboxes(uint64_t xor_result) {
+    uint32_t sbox_result = 0;
+
+    for (int i = 0; i < 8; ++i) {
+        // Pobierz odpowiednie 6 bitów (zaczynając od najbardziej znaczących)
+        uint32_t chunk = (xor_result >> (6 * (7 - i))) & 0x3F;
+
+        // Wyciągnij bity rzędu (pierwszy i ostatni bit)
+        uint32_t row = ((chunk & 0x20) >> 4) | (chunk & 0x01);
+
+        // Wyciągnij bity kolumny (środkowe 4 bity)
+        uint32_t col = (chunk >> 1) & 0x0F;
+
+        // Znajdź wartość z odpowiedniego S-Boxa i zapisz w wyniku
+        sbox_result |= (SBOX[i][row][col] << (4 * (7 - i)));
+    }
+
+    cout << "Wynik S-Boxów: " << bitset<32>(sbox_result) << endl;
+    return sbox_result;
+}
+
 // Funkcja rundy Feistela
 pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
     cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
@@ -333,10 +357,10 @@ pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_ke
     uint64_t xor_result = expanded_R ^ round_key;
     cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
 
-    // S-Boxy (brak pełnej implementacji S-Boxów — wynik bezpośrednio kopiowany)
-    // Zakładamy uproszczony wynik (pierwsze 32 bity XOR wyników)
-    uint32_t sbox_result = static_cast<uint32_t>((xor_result >> 16) ^ xor_result); // Placeholder
-    cout << "Wynik S-Boxów: " << bitset<32>(sbox_result) << endl;
+    uint32_t sbox_result = apply_sboxes(xor_result);
+
+    // Wynik po S-Boxach
+    cout << "Wynik po S-Boxach: " << bitset<32>(sbox_result) << endl;
 
     // Permutacja P
     uint32_t pbox_result = permute_P(sbox_result);
@@ -365,26 +389,58 @@ int main() {
 
     vector<uint64_t> input_in_uint64 = stringToUint64(input);
 
-    // Przeprowadzenie IP i podział na L i R
+    vector<pair<uint32_t, uint32_t>> split_blocks;
     for (auto &block : input_in_uint64) {
-        cout << "Original block: " << hex << block << endl;
-        
-        // Przeprowadź permutację początkową (IP)
-        uint64_t permuted_block = initial_permute(block, IP.data(), 64);
-        cout << "After Initial Permutation: " << hex << permuted_block << endl;
+    uint64_t permuted_block = initial_permute(block, IP.data(), 64);
+    auto [L0, R0] = splitBlock(permuted_block);
+    split_blocks.emplace_back(L0, R0);
+    }
+
+    // Teraz możesz używać split_blocks
+    for (const auto &[L, R] : split_blocks) {
+    cout << "L: " << bitset<32>(L) << ", R: " << bitset<32>(R) << endl;
     }
 
     bitset<64> masterkeyBitset = stringToBitset64(masterkey);
 
-    // Dla testów
-    //bitset<64> key("133457799BBCDFF1");
-
     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
     cout << "Master key in bits: " << masterkeyBitset << endl;
 
-    // Wyświetlanie kluczy rundowych
-    for (int i = 0; i < round_keys.size(); ++i) {
-        cout << "Round " << i + 1 << " key: " << round_keys[i] << endl;
+    // // Wyświetlanie kluczy rundowych
+    // for (int i = 0; i < round_keys.size(); ++i) {
+    //     cout << "Round " << i + 1 << " key: " << round_keys[i] << endl;
+    // }
+
+        // Przetwarzanie każdego bloku przez 16 rund Feistela
+    for (auto &[L, R] : split_blocks) {
+        cout << "Processing block: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+
+        for (int i = 0; i < 16; ++i) {
+            uint64_t round_key = round_keys[i].to_ullong(); // Konwersja klucza na uint64_t
+            cout << "Round " << i + 1 << " with key: " << bitset<48>(round_key) << endl;
+            tie(L, R) = feistel_round(L, R, round_key); // Wykonanie rundy Feistela
+            cout << "After round " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+        }
+
+        // Zamiana miejsc po 16 rundach
+        swap(L, R);
+
+        // Wyświetlenie końcowego wyniku bloku
+        cout << "Block after 16 rounds: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+    }
+
+    // Możesz teraz połączyć przetworzone bloki w finalny wynik (opcjonalne)
+    vector<uint64_t> processed_blocks;
+    for (const auto &[L, R] : split_blocks) {
+        uint64_t processed_block = (static_cast<uint64_t>(L) << 32) | R;
+        processed_blocks.push_back(processed_block);
+    }
+
+    // Wyświetlenie przetworzonych bloków
+    cout << "Processed blocks:" << endl;
+    for (const auto &block : processed_blocks) {
+        cout << "Output w bitach: " << bitset<64>(block) << endl;
+        cout << "Output w hex: " << hex << block << endl;
     }
 
     return 0;
