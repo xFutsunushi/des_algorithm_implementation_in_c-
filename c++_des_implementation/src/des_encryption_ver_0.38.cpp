@@ -331,7 +331,7 @@ uint64_t final_permutation(uint64_t input, const int* permutation_table) {
 }
 
 int main() {
-    string input = "596F7572206C6970" ; // zmienna do trzymania wejścia z klawiatury
+    string input = "Your lips are smoother than vaseline" ; // zmienna do trzymania wejścia z klawiatury
     //string input = "596F7572206C6970 732061726520736D 6F6F746865722074 68616E2076617365 6C696E650D0A";
     //string input = "8787878787878787";
 
@@ -367,11 +367,6 @@ int main() {
     // uint64_t input_value = test_input2.to_ullong();
     // uint64_t permute_test = initial_permute(input_value, IP.data(), 64);
     // cout << "PERMUTE TEST !!!!!!!!!!!: " << permute_test << endl;
-
-    // Podziel bloki na lewą i prawą stronę 
-    for (const auto &[L, R] : split_blocks) {
-    //cout << "L: " << bitset<32>(L) << ", R: " << bitset<32>(R) << endl;
-    }
 
     // Przetwarzanie każdego bloku przez 16 rund Feistela
     for (auto &[L, R] : split_blocks) {
