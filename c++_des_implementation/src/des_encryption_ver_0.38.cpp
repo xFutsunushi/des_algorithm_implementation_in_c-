@@ -342,14 +342,24 @@ pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_ke
     return {R, new_R};
 }
 
-uint64_t final_permutation(uint64_t input, const int* permutation_table) {
-    uint64_t output = 0;
-    for (size_t i = 0; i < 64; ++i) {
-        size_t bit_position = FP[i] - 1;
-        uint64_t bit = (input >> (63 - bit_position)) & 1;
-        output |= bit << (63 - i);  // Zapisz bit w odpowiedniej pozycji w wyniku
+// bitset<64> final_permutation(bitset<64> input, const int* permutation_table) {
+//     bitset<64> output = 0;
+//     for (size_t i = 0; i < 64; ++i) {
+//         size_t bit_position = FP[i] - 1;
+//         bitset<64> bit = (input >> (63 - bit_position)) & 1;
+//         output |= bit << (63 - i);  // Zapisz bit w odpowiedniej pozycji w wyniku
+//     }
+//     return output;
+// }
+
+bitset<64> final_permutation(const bitset<64>& block, const array<int, 64>& perm_table) {
+    bitset<64> permuted_block;
+    
+    for (int i = 0; i < 64; ++i) {
+        permuted_block[63 - i] = block[64 - perm_table[i]];
     }
-    return output;
+    
+    return permuted_block;
 }
 
 void test_expand() {
@@ -429,7 +439,7 @@ int main() {
     cout << "Po zamianie miejsc: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
 
     // Wykonanie finalnej permutacji
-    uint64_t final_block = final_permutation((static_cast<uint64_t>(L) << 32) | R, FP.data());
+    bitset<64> final_block = final_permutation((static_cast<uint64_t>(L) << 32) | R, FP);
     cout << "Blok po finalnej permutacji: " << bitset<64>(final_block) << endl;
 
     // Wyświetlenie końcowego wyniku bloku
@@ -445,6 +455,16 @@ int main() {
     // bitset<32> sbox_output = apply_sboxes(sbox_input).to_ullong();  // Funkcja S-Box
     // cout << "S-Box input: " << bitset<48>(sbox_input) << endl;
     // cout << "S-Box output: " << bitset<32>(sbox_output) << endl;
+        // Przykładowy blok po 16 rundach
+    bitset<64> test_block("1101110010100101000101100010101011101011101011100101101010100101");
+    
+    cout << "Blok przed finalną permutacją: " << test_block << endl;
+
+    // Finalna permutacja
+    bitset<64> permuted_block = final_permutation(test_block, FP);
+    
+    cout << "Blok po finalnej permutacji: " << permuted_block << endl;
+
     }
     return 0;
 }
