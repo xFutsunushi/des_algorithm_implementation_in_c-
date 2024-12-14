@@ -1,34 +1,26 @@
 #include <iostream>
-#include <string>
 #include <cstring>
 using namespace std;
 
 int main() {
-    const int rozmiar = 50;
-    char text[rozmiar];
-
-    //Wypisujemy ciag
-    cout << "Podaj text: ";
-    cin.getline(text, rozmiar);
-    //Liczenie liczby samoglosek
-    int liczbaSamoglosek;
-
-    const char *cstr = text;
-    string s = cstr;
-
+    const int rozmiar = 6; // Rozmiar tablicy samogłosek
     char substring[rozmiar] = {'a', 'e', 'i', 'o', 'u', 'y'};
 
-    for ( int i = 0; i < cstr.length(); ++i) {
-        if ( text[i]  substring );
-        cout << substring; 
-        //liczbaSamoglosek++;
-        //cout << "Znaleziono samogloske" << endl; 
+    string tekst;
+    cout << "Podaj ciag znakow: ";
+    getline(cin, tekst);
 
+    cout << "Znalezione samogloski: ";
+    for (char znak : tekst) {
+        // Sprawdzamy, czy znak jest samogłoską
+        for (int i = 0; i < rozmiar; i++) {
+            if (tolower(znak) == substring[i]) { // Konwersja do małych liter
+                cout << znak << " ";
+                break;
+            }
+        }
     }
-
-    cout << liczbaSamoglosek << endl;
+    cout << endl;
 
     return 0;
 }
-
-// DO POPRAWKI !!!!
