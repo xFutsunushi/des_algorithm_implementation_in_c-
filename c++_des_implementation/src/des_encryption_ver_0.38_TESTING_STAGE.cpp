@@ -31,6 +31,23 @@ string binaryToText(const string &binary) {
     return plaintext;
 }
 
+std::string textToHex(const std::string& text, size_t blockSize = 4) {
+    std::stringstream hexStream;
+    size_t count = 0;
+
+    for (char c : text) {
+        hexStream << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << static_cast<int>(static_cast<unsigned char>(c));
+        count++;
+
+        // Dodaj spację co "blockSize" znaków, aby poprawić czytelność
+        if (blockSize > 0 && count % blockSize == 0) {
+            hexStream << " ";
+        }
+    }
+
+    return hexStream.str();
+}
+
 // Funkcja do konwersji tekstu na uint64_t
 vector<uint64_t> stringToUint64(const string& input) {
     vector<uint64_t> result;
@@ -44,20 +61,6 @@ vector<uint64_t> stringToUint64(const string& input) {
         result.push_back(chunk);
     }
     return result;
-}
-
-uint64_t text_to_hex(const string &text, size_t block_index) {
-    uint64_t block = 0;
-    size_t index = block_index * 8;
-    // Sprawdzamy, czy mamy wystarczająco znaków
-    for (size_t i = 0; i < 8; ++i) {
-        if (index + i < text.size()) {
-            // Znak na pozycji 'index + i', rzutujemy na 8-bitową liczbę
-            // i przesuwamy odpowiednio do 64-bitowego bloku
-            block |= static_cast<uint64_t>(text[index + i]) << (56 - 8 * i);
-        }
-    }
-    return block;
 }
 
 // Funkcja permutacji P
@@ -76,19 +79,28 @@ bitset<64> initial_permutation(const bitset<64>& input, const array<int, 64>& IP
     cout << "\nDebugowanie Initial Permutation (IP):" << endl;
     cout << "Wejściowy ciąg bitów: " << input << endl;
 
-    for (int i = 0; i < 64; ++i) {
-        // Indeksowanie w tablicy IP jest od 1, więc odejmujemy 1, aby uzyskać indeks 0-bazowy
-        int bit_position = IP[i] - 1;
-        permuted[63 - i] = input[63 - bit_position];
+    // for (int i = 0; i < 64; ++i) {
+    //     // Indeksowanie w tablicy IP jest od 1, więc odejmujemy 1, aby uzyskać indeks 0-bazowy
+    //     int bit_position = IP[i] - 1;
+    //     permuted[63 - i] = input[63 - bit_position];
 
-        // Wypisanie szczegółowych informacji o operacji
-        cout << "Pozycja bitu w wejściu: " << (63 - bit_position) 
-             << " (bit: " << input[63 - bit_position] << ") -> "
-             << "Pozycja w wyniku: " << (63 - i) << endl;
+    //     // Wypisanie szczegółowych informacji o operacji
+    //     cout << "Pozycja bitu w wejściu: " << (63 - bit_position) 
+    //          << " (bit: " << input[63 - bit_position] << ") -> "
+    //          << "Pozycja w wyniku: " << (63 - i) << endl;
+    // }
+
+        bitset<64> output;
+        for (size_t i = 0; i < 64; ++i) {
+            output[63 - i] = input[64 - IP[i]]; // Mapowanie pozycji zgodnie z tablicą IP
+
+        // Debug: wyświetl mapowanie dla każdego bitu
+        cout << "Pozycja bitu w wejściu: " << (64 - IP[i])
+            << " (bit: " << input[64 - IP[i]] << ") -> Pozycja w wyniku: " << (63 - i) << std::endl;
     }
 
     cout << "Wynikowy ciąg bitów: " << permuted << endl;
-    return permuted;
+    return output;
 }
 // Funkcja pomocnicza do konwersji 64-bitowego klucza do bitów
 
@@ -332,7 +344,7 @@ pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_ke
     cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
 
     // XOR z lewą częścią
-    uint32_t new_R = L ^ pbox_result;
+    uint32_t new_R = L ^ pbox_result; /// Sprawdzić czemu lewa 
 
     // Zwracamy nowe części
     return {R, new_R};
@@ -372,6 +384,10 @@ int main() {
     bitset<64> masterkeyBitset = stringToBitset64(hex_masterkey);
     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
 
+    cout << "Podany tekst hexadecymalnie: ";
+    cout << textToHex(input, 8)<<  endl;
+    cout << endl;
+
     // Konwertujemy ciąg binarny na 64-bitowe bloki
     vector<string> blocks = split_into_blocks(input);
 
@@ -391,6 +407,11 @@ int main() {
 
         // Wypisanie permutowanego bloku
         cout << permuted_block << endl;
+    }
+
+    // Wyświetlanie kluczy rundowych -- sprawdzone, funkcja dziala
+    for (int i = 0; i < round_keys.size(); ++i) {
+        cout << "Round " << i + 1 << " key: " << round_keys[i] << endl;
     }
 
     // Dzielimy tekst na 64-bitowe bloki
