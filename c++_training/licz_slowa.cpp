@@ -7,7 +7,7 @@ using namespace std;
 int main() {
     // const int max_length = 30;
     // string zdanie[max_length];
-    const string zdanie = "Ala ma kota";
+    const string zdanie = "Policz zdania w tekscie raz dwa raz";
 
     // cout << "Podaj zdanie do podzielenia na slowa" << endl; 
     // getline(cin, zdanie);
