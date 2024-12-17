@@ -132,7 +132,7 @@ bitset<64> stringToBitset64(const string& hex_str) {
 }
 
 // Funkcja do dzielenia ciągu binarnego na 64-bitowe bloki
-vector<string> split_into_blocks(const string &input) {
+vector<string> split_string_into_binary_blocks(const string &input) {
     vector<string> blocks;
     size_t block_size = 64;  // Rozmiar bloku 64 bity
     size_t input_size = input.size() * 8;  // Rozmiar wejścia w bitach
@@ -140,7 +140,7 @@ vector<string> split_into_blocks(const string &input) {
     // Konwertujemy string na ciąg bitów
     string binary_input = "";
     for (char c : input) {
-        binary_input += std::bitset<8>(c).to_string();
+        binary_input += bitset<8>(c).to_string();
     }
 
     // Upewniamy się, że ciąg ma długość podzielną przez 64 bity
@@ -382,13 +382,14 @@ int main() {
     string input = "Your lips are smoother than vaseline";
 
     string binary_input = text_to_binary(input);  // Twoja funkcja konwersji tekstu na binarny ciąg
+
     //cout << "Długość ciągu binarnego: " << binary_input.length() << endl;
     //cout << "Binarny ciąg: " << binary_input<< endl;
     cout << binary_input << endl; 
 
     string hex_masterkey = "0E329232EA6D0D73"; 
     bitset<64> masterkeyBitset = stringToBitset64(hex_masterkey);
-    vector<uint64_t> input_in_uint64 = stringToUint64(input);
+    //vector<uint64_t> input_in_uint64 = stringToUint64(input);
 
     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
     cout << "Master key in bits: " << masterkeyBitset << endl;
@@ -400,7 +401,7 @@ int main() {
     // }
 
     // Dzielimy tekst na 64-bitowe bloki
-    vector<string> blocks = split_into_blocks(input);
+    vector<string> blocks = split_string_into_binary_blocks(input);
 
     // Wypisanie podzielonych bloków
     cout << "Podzielone bloki: " << endl;
@@ -442,10 +443,10 @@ int main() {
     // Wykonanie finalnej permutacji
     bitset<64> final_block = final_permutation((static_cast<uint64_t>(L) << 32) | R, FP);
     cout << "Blok po finalnej permutacji: " << bitset<64>(final_block) << endl;
-    //cout << "0x" << uppercase << hex << setw(16) << setfill('0') << final_block.to_ullong() << endl;
+    cout << "0x" << uppercase << hex << setw(16) << setfill('0') << final_block.to_ullong() << endl;
 
     // Wyświetlenie końcowego wyniku bloku
-    cout << "Blok po 16 rundach i finalnej permutacji: " << bitset<64>(final_block) << " (" << hex << uppercase << final_block << ")" << endl;
+    cout << "Blok po 16 rundach i finalnej permutacji: " << bitset<64>(final_block) << endl; // << " (" << hex << uppercase << final_block << ")" << endl;
     
     // cout << endl;
     // cout << "TEST Expand function" << endl; 
@@ -460,12 +461,12 @@ int main() {
         // Przykładowy blok po 16 rundach
     // bitset<64> test_block("1101110010100101000101100010101011101011101011100101101010100101");
     
-    // cout << "Blok przed finalną permutacją: " << test_block << endl;
+    //cout << "Blok przed finalną permutacją: " << test_block << endl;
 
-    // // Finalna permutacja
-    // bitset<64> permuted_block = final_permutation(test_block, FP);
+    // Finalna permutacja
+    //bitset<64> permuted_block = final_permutation(test_block, FP);
     
-    // cout << "Blok po finalnej permutacji: " << permuted_block << endl;
+    //cout << "Blok po finalnej permutacji: " << permuted_block << endl;
 
     }
     return 0;

@@ -31,7 +31,7 @@ string binaryToText(const string &binary) {
     return plaintext;
 }
 
-std::string textToHex(const std::string& text, size_t blockSize = 4) {
+string textToHex(const string& text, size_t blockSize = 4) {
     std::stringstream hexStream;
     size_t count = 0;
 
@@ -63,21 +63,21 @@ vector<uint64_t> stringToUint64(const string& input) {
     return result;
 }
 
-// Funkcja permutacji P
-uint32_t permute_P(uint32_t sbox_result) {
-    uint32_t pbox_result = 0;
+bitset<32> permute_P(const bitset<32>& sbox_result) {
+    bitset<32> pbox_result;
+    
     for (int i = 0; i < 32; ++i) {
         int bit_position = P[i] - 1;  // Indeksowanie od 1 w permutacji
-        pbox_result |= ((sbox_result >> bit_position) & 1) << (31 - i);  // Ustawiamy bity zgodnie z permutacją
+        pbox_result[31 - i] = sbox_result[bit_position];  // Ustawiamy bity zgodnie z permutacją
     }
+
     return pbox_result;
 }
 
 // Funkcja permutacji z debugowaniem
 bitset<64> initial_permutation(const bitset<64>& input, const array<int, 64>& IP) {
     bitset<64> permuted;
-    cout << "\nDebugowanie Initial Permutation (IP):" << endl;
-    cout << "Wejściowy ciąg bitów: " << input << endl;
+    //cout << "\nDebugowanie Initial Permutation (IP):" << endl;
 
     // for (int i = 0; i < 64; ++i) {
     //     // Indeksowanie w tablicy IP jest od 1, więc odejmujemy 1, aby uzyskać indeks 0-bazowy
@@ -95,11 +95,10 @@ bitset<64> initial_permutation(const bitset<64>& input, const array<int, 64>& IP
             output[63 - i] = input[64 - IP[i]]; // Mapowanie pozycji zgodnie z tablicą IP
 
         // Debug: wyświetl mapowanie dla każdego bitu
-        cout << "Pozycja bitu w wejściu: " << (64 - IP[i])
-            << " (bit: " << input[64 - IP[i]] << ") -> Pozycja w wyniku: " << (63 - i) << std::endl;
+        //cout << "Pozycja bitu w wejściu: " << (64 - IP[i])
+        //    << " (bit: " << input[64 - IP[i]] << ") -> Pozycja w wyniku: " << (63 - i) << std::endl;
     }
 
-    cout << "Wynikowy ciąg bitów: " << permuted << endl;
     return output;
 }
 // Funkcja pomocnicza do konwersji 64-bitowego klucza do bitów
@@ -165,22 +164,38 @@ vector<string> split_into_blocks(const string &input) {
     return blocks;
 }
 
-uint64_t expand(uint32_t R) {
-    uint64_t expanded_R = 0;
+vector<bitset<64>> split_binary_into_blocks(const bitset<64>& binary_input) {
+    vector<bitset<64>> blocks;
+    size_t block_size = 64;  // Rozmiar bloku 64 bity
+
+    // Dzielimy ciąg bitów na 64-bitowe bloki
+    size_t input_size = binary_input.size();
+    for (size_t i = 0; i < input_size; i += block_size) {
+        bitset<64> block;
+        for (size_t j = 0; j < block_size; ++j) {
+            if (i + j < input_size) {
+                block[j] = binary_input[i + j];
+            }
+        }
+        blocks.push_back(block);
+    }
+
+    return blocks;
+}
+
+bitset<48> expand(const bitset<32>& R) {
+    bitset<48> expanded_R;
 
     // Iteracja po tabeli rozszerzenia
     for (int i = 0; i < 48; ++i) {
         int bit_position = E[i] - 1;  // Indeksowanie od 1 w tabeli (0-bazowe w C)
-        uint64_t bit = (R >> (31 - bit_position)) & 1;  // Poprawne przesunięcie bitu z R
+        
+        // Przesunięcie bitu z R na odpowiednią pozycję
+        bool bit = R[31 - bit_position];  // Używamy indeksowania bitset w odwrotnej kolejności
 
-        // Debugowanie: Wypisanie bitu, który jest kopiowany
-        //cout << "Bit " << i << ": " << bit << " (from R[" << (31 - bit_position) << "])" << std::endl;
-
-        expanded_R |= (bit << (47 - i));  // Ustawienie bitu w odpowiedniej pozycji
+        // Ustawienie bitu w odpowiedniej pozycji w expanded_R
+        expanded_R[47 - i] = bit;  // Ustawienie bitu w odpowiedniej pozycji
     }
-
-    // Debugowanie: Wypisanie całego rozszerzonego wyniku
-    //cout << "Expanded R: " << std::bitset<48>(expanded_R) << std::endl;
 
     return expanded_R;
 }
@@ -293,58 +308,80 @@ void load_round_keys(vector<bitset<48>>& round_keys, const string& filename) {
     cout << "Klucze rundowe zostały załadowane z pliku: " << filename << endl;
 }
 
-// Funkcja obsługująca S-Boxy
-bitset<32> apply_sboxes(bitset<48> xor_result) {
+bitset<32> apply_sboxes(bitset<48> xor_result, bool debug = false) {
     bitset<32> sbox_result;
 
     for (int i = 0; i < 8; ++i) {
-        // Pobierz odpowiednie 6 bitów (zaczynając od najbardziej znaczących)
-        uint64_t chunk = (xor_result.to_ulong() >> (6 * (7 - i))) & 0x3F; // Zamiana na unsigned long
+        // Wydzielamy odpowiednie 6 bitów z xor_result
+        bitset<6> chunk;
+        for (int j = 0; j < 6; ++j) {
+            chunk[j] = xor_result[6 * i + j];  // Pobieramy 6 bitów na podstawie indeksów
+        }
 
-        // Wyciągnij bity rzędu (pierwszy i ostatni bit)
-        uint32_t row = ((chunk & 0x20) >> 4) | (chunk & 0x01); // Najbardziej znaczący i najmniej znaczący bit
-        // Wyciągnij bity kolumny (środkowe 4 bity)
-        uint32_t col = (chunk >> 1) & 0x0F;
+        if (debug) {
+            cout << "Krok " << i + 1 << " - chunk (6 bitów): " << chunk << endl;
+        }
 
-        // Znajdź wartość z odpowiedniego S-Boxa i zapisz w wyniku
-        uint8_t sbox_value = SBOX[i][row][col];
+        // Wyciągamy bity rzędu (pierwszy i ostatni bit)
+        bitset<2> row;
+        row[0] = chunk[0];  // Przypisujemy pierwszy bit
+        row[1] = chunk[5];  // Przypisujemy ostatni bit
 
-        // Zapewniamy, żeby wynik z S-Boxa był zapisany w odpowiedniej pozycji w sbox_result
-        sbox_result |= (bitset<32>(sbox_value) << (4 * (7 - i)));
+        if (debug) {
+            cout << "Rząd: " << row << " (bity: " << chunk[0] << ", " << chunk[5] << ")" << endl;
+        }
+
+        // Wyciągamy bity kolumny (środkowe 4 bity)
+        bitset<4> col_bits;
+        for (int j = 1; j < 5; ++j) {
+            col_bits[j - 1] = chunk[j]; // Środkowe bity (1 do 4)
+        }
+
+        if (debug) {
+            cout << "Kolumna: " << col_bits << endl;
+        }
+
+        // Znajdujemy wartość z odpowiedniego S-Boxa i zapisujemy ją w wyniku
+        bitset<4> sbox_value = SBOX[i][row.to_ulong()][col_bits.to_ulong()]; // Wartość z S-Boxa
+
+        if (debug) {
+            cout << "Wartość z S-Boxa: " << sbox_value << endl;
+        }
+
+        // Przekształcamy sbox_value do bitset<32> (przesuwamy ją na odpowiednią pozycję)
+        sbox_result |= (sbox_value.to_ulong() << (4 * (7 - i))); // Przesuwamy i ustawiamy w odpowiednich bitach
+
+        if (debug) {
+            cout << "sbox_result po dodaniu: " << sbox_result << endl;
+        }
     }
 
     return sbox_result;
 }
 
 // Funkcja rundy Feistela
-pair<uint32_t, uint32_t> feistel_round(uint32_t L, uint32_t R, uint64_t round_key) {
-    cout << "Przed rundą Feistela: L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+pair<bitset<32>, bitset<32>> feistel_round(bitset<32> L, bitset<32> R, bitset<48> round_key) {
+    cout << "Przed rundą Feistela: L = " << L << ", R = " << R << endl;
     
     // Ekspansja Prawa część (R) na 48 bitów
-    uint64_t expanded_R = expand(R);
-    cout << "Rozszerzone R: " << bitset<48>(expanded_R) << endl;
+    bitset<48> expanded_R = expand(R); // Funkcja expand powinna zwracać bitset<48>
+    cout << "Rozszerzone R: " << expanded_R << endl;
 
     // XOR z kluczem rundy
-    uint64_t xor_result = expanded_R ^ round_key;
-    cout << "R po XOR z kluczem rundy: " << bitset<48>(xor_result) << endl;
-    // Debugowanie: Wypisz oba operandy przed XOR
-    cout << "expanded_R: " << bitset<48>(expanded_R) <<    endl;
-    cout << "round_key: " << bitset<48>(round_key) << endl;
+    bitset<48> xor_result = expanded_R ^ round_key;  // XOR na poziomie bitów
+    cout << "R po XOR z kluczem rundy: " << xor_result << endl;
+    cout << endl;
 
-    // Wypisz wynik operacji XOR
-    cout << "xor_result: " << bitset<48>(xor_result) <<    endl;
-
-    uint32_t sbox_result = apply_sboxes(xor_result).to_ullong();
-
-    // Wynik po S-Boxach
-    cout << "Wynik po S-Boxach: " << bitset<32>(sbox_result) << endl;
+    // Zastosowanie S-boxów (musisz dostosować funkcję, by działała na bitset<48>)
+    bitset<32> sbox_result = apply_sboxes(xor_result, true); // Zmieniamy na bitset<32>
+    cout << "Wynik po S-Boxach: " << sbox_result << endl;
 
     // Permutacja P
-    uint32_t pbox_result = permute_P(sbox_result);
-    cout << "Wynik permutacji P: " << bitset<32>(pbox_result) << endl;
+    bitset<32> pbox_result = permute_P(sbox_result); // Funkcja permute_P powinna zwracać bitset<32>
+    cout << "Wynik permutacji P: " << pbox_result << endl;
 
     // XOR z lewą częścią
-    uint32_t new_R = L ^ pbox_result; /// Sprawdzić czemu lewa 
+    bitset<32> new_R = L ^ pbox_result;  // XOR na poziomie bitów z lewą częścią
 
     // Zwracamy nowe części
     return {R, new_R};
@@ -360,93 +397,95 @@ bitset<64> final_permutation(const bitset<64>& block, const array<int, 64>& perm
     return permuted_block;
 }
 
-void test_expand() {
-    uint32_t test_R = 0b11110000101010101111000010101010;
-    uint64_t expected_result = 0b011110100001010101010101011110100001010101010101;
-    uint64_t actual_result = expand(test_R);
+// void test_expand() {
+//     bitset<32> test_R = 0b11110000101010101111000010101010;
+//     bitset<64> expected_result = 0b011110100001010101010101011110100001010101010101;
+//     bitset<64> actual_result = expand(test_R);
     
-    cout << "Input R: " << bitset<32>(test_R) << endl;
-    cout << "Expanded R: " << bitset<48>(actual_result) << endl;
+//     cout << "Input R: " << bitset<32>(test_R) << endl;
+//     cout << "Expanded R: " << bitset<48>(actual_result) << endl;
 
-    if (actual_result == expected_result) {
-        cout << "Test PASSED!" << endl;
-    } else {
-        cout << "Test FAILED!" << endl;
-        cout << "Expected: " << bitset<48>(expected_result) << endl;
-    }
-}
+//     if (actual_result == expected_result) {
+//         cout << "Test PASSED!" << endl;
+//     } else {
+//         cout << "Test FAILED!" << endl;
+//         cout << "Expected: " << bitset<48>(expected_result) << endl;
+//     }
+// }
 
 int main() {
-    string input = "Your lips are smoother than vaseline";
-    //string binary_input = text_to_binary(input);  // Twoja funkcja konwersji tekstu na binarny ciąg
-
-    string hex_masterkey = "0E329232EA6D0D73"; 
+    bitset<64> input("0000000100100011010001010110011110001001101010111100110111101111");
+    string hex_masterkey = "133457799BBCDFF1"; 
     bitset<64> masterkeyBitset = stringToBitset64(hex_masterkey);
     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
-
-    cout << "Podany tekst hexadecymalnie: ";
-    cout << textToHex(input, 8)<<  endl;
-    cout << endl;
-
-    // Konwertujemy ciąg binarny na 64-bitowe bloki
-    vector<string> blocks = split_into_blocks(input);
+    vector<bitset<64>> blocks = split_binary_into_blocks(input);
 
     // Wypisujemy oryginalne bloki przed inicjalną permutacją
-    cout << "Bloki przed inicjalną permutacją: " << endl;
     for (const auto &block : blocks) {
-        cout << block << endl;
+        cout << "Blok przed initial Permutation: " << block << endl;
     }
 
-    // Przetwarzamy każdy blok przez inicjalną permutację
+    // Przetwarzamy każdy blok 64 bitowy przez inicjalną permutację
     for (const auto &block : blocks) {
-        // Tworzymy bitset 64-bitowy z bloku
-        bitset<64> block_bitset(block);
-        
         // Wykonanie inicjalnej permutacji
-        bitset<64> permuted_block = initial_permutation(block_bitset, IP);
-
-        // Wypisanie permutowanego bloku
-        cout << permuted_block << endl;
+        bitset<64> permuted_block = initial_permutation(block, IP);
+        cout << "Wynik po Initial Permutation: " << permuted_block << endl;
     }
 
-    // Wyświetlanie kluczy rundowych -- sprawdzone, funkcja dziala
-    for (int i = 0; i < round_keys.size(); ++i) {
-        cout << "Round " << i + 1 << " key: " << round_keys[i] << endl;
-    }
-
-    // Dzielimy tekst na 64-bitowe bloki
-    //vector<string> blocks = split_into_blocks(input);
+    // // Wyświetlanie kluczy rundowych -- sprawdzone, funkcja dziala
+    // for (int i = 0; i < round_keys.size(); ++i) {
+    //     cout << "Round " << i + 1 << " key: " << round_keys[i] << endl;
+    // }
 
     // Iteracja po blokach, wykonywanie rund Feistela
     for (int block_idx = 0; block_idx < blocks.size(); ++block_idx) {
-        string block = blocks[block_idx];
-        uint32_t L = bitset<32>(block.substr(0, 32)).to_ulong();
-        uint32_t R = bitset<32>(block.substr(32, 32)).to_ulong();
+        bitset<64> block = blocks[block_idx];
 
-        cout << "Przetwarzany blok " << block_idx + 1 << ": " << endl;
-        cout << "L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+        // Wykonanie inicjalnej permutacji na bloku
+        bitset<64> permuted_block = initial_permutation(block, IP);
+
+        // Dzielimy permutowany blok na dwie części
+        bitset<32> L, R;
+        for (int i = 0; i < 32; ++i) {
+            R[i] = permuted_block[i];          // Pierwsze 32 bity idą do L
+            L[i] = permuted_block[i + 32];     // Kolejne 32 bity idą do R
+    }
+
+    // Wyświetlamy L0 i R0 po podzieleniu
+    cout << "L0: " << L << ", R0: " << R << endl;
 
         // Przeprowadzenie 16 rund Feistela
         for (int i = 0; i < 16; ++i) {
             uint64_t round_key = round_keys[i].to_ullong(); // Konwersja klucza na uint64_t
+            cout << endl;
             cout << "Runda " << i + 1 << " z kluczem: " << bitset<48>(round_key) << endl;
 
             // Wywołanie rundy Feistela
             tie(L, R) = feistel_round(L, R, round_key); // Wykonanie rundy Feistela
             cout << "Po rundzie " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+            cout << endl;
         }
 
         // Zamiana miejsc po 16 rundach
         swap(L, R);
-        uint32_t final_L = L;
-        uint32_t final_R = R;
+        bitset<32> final_L = L;
+        bitset<32> final_R = R;
 
-        // Przed finalną permutacją
-        bitset<64> final_block = final_permutation((static_cast<uint64_t>(final_L) << 32) | final_R, FP);
-        cout << "Blok po 16 rundach i finalnej permutacji: ";
-        
-        // Wypisanie finalnego bloku w formacie szesnastkowym
-        cout << "Blok " << block_idx + 1 << ": 0x" << uppercase << hex << setw(16) << setfill('0') << final_block.to_ullong() << endl;
+    // Połączenie final_L i final_R w final_block (64 bity)
+    bitset<64> final_block;
+    for (int i = 0; i < 32; ++i) {
+        final_block[i + 32] = final_R[i];  // Kopiowanie bitów z final_R do final_block (od 32. bitu w górę)
+        final_block[i] = final_L[i];       // Kopiowanie bitów z final_L do final_block (od 0. bitu w górę)
+    }
+
+    // Wypisanie finalnego bloku
+    cout << "Blok po 16 rundach i finalnej permutacji: " << endl;
+
+    // Wypisanie w postaci binarnej
+    cout << "Blok " << block_idx + 1 << " (w binarnym): " << final_block << endl;
+
+    // Wypisanie w postaci szesnastkowej
+    cout << "Blok " << block_idx + 1 << " (w hex): 0x" << uppercase << hex << setw(16) << setfill('0') << final_block.to_ullong() << endl;
     }
 
     return 0;

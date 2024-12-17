@@ -17,6 +17,26 @@
 
 using namespace std;
 
+// Funkcja konwertująca bitset<64> na tekst
+string bitsetToText(const bitset<64>& block) {
+    string result = "";
+    for (int i = 0; i < 8; ++i) {
+        // Pobieramy 8-bitową część
+        bitset<8> byte(block.to_ullong() >> (i * 8));
+        result = char(byte.to_ulong()) + result;
+    }
+    return result;
+}
+
+// Funkcja przekształcająca dane z formatu hex na bitset<64>
+bitset<64> hexToBitset64(const string& hex_str) {
+    bitset<64> result;
+    stringstream ss;
+    ss << hex << hex_str;
+    ss >> result;
+    return result;
+}
+
 string binaryToText(const string &binary) {
     if (binary.size() % 8 != 0) {
         throw invalid_argument("Binarka musi być wielokrotnością 8 bitów.");
@@ -31,12 +51,12 @@ string binaryToText(const string &binary) {
     return plaintext;
 }
 
-std::string textToHex(const std::string& text, size_t blockSize = 4) {
-    std::stringstream hexStream;
+string textToHex(const string& text, size_t blockSize = 4) {
+    stringstream hexStream;
     size_t count = 0;
 
     for (char c : text) {
-        hexStream << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << static_cast<int>(static_cast<unsigned char>(c));
+        hexStream << hex << uppercase << setw(2) << setfill('0') << static_cast<int>(static_cast<unsigned char>(c));
         count++;
 
         // Dodaj spację co "blockSize" znaków, aby poprawić czytelność
@@ -79,22 +99,11 @@ bitset<64> initial_permutation(const bitset<64>& input, const array<int, 64>& IP
     cout << "\nDebugowanie Initial Permutation (IP):" << endl;
     cout << "Wejściowy ciąg bitów: " << input << endl;
 
-    // for (int i = 0; i < 64; ++i) {
-    //     // Indeksowanie w tablicy IP jest od 1, więc odejmujemy 1, aby uzyskać indeks 0-bazowy
-    //     int bit_position = IP[i] - 1;
-    //     permuted[63 - i] = input[63 - bit_position];
+    bitset<64> output;
+    for (size_t i = 0; i < 64; ++i) {
+        output[63 - i] = input[64 - IP[i]]; // Mapowanie pozycji zgodnie z tablicą IP
 
-    //     // Wypisanie szczegółowych informacji o operacji
-    //     cout << "Pozycja bitu w wejściu: " << (63 - bit_position) 
-    //          << " (bit: " << input[63 - bit_position] << ") -> "
-    //          << "Pozycja w wyniku: " << (63 - i) << endl;
-    // }
-
-        bitset<64> output;
-        for (size_t i = 0; i < 64; ++i) {
-            output[63 - i] = input[64 - IP[i]]; // Mapowanie pozycji zgodnie z tablicą IP
-
-        // Debug: wyświetl mapowanie dla każdego bitu
+    // Debug: wyświetl mapowanie dla każdego bitu
         cout << "Pozycja bitu w wejściu: " << (64 - IP[i])
             << " (bit: " << input[64 - IP[i]] << ") -> Pozycja w wyniku: " << (63 - i) << std::endl;
     }
@@ -106,11 +115,11 @@ bitset<64> initial_permutation(const bitset<64>& input, const array<int, 64>& IP
 
 // Funkcja konwertująca tekst na ciąg binarny
 string text_to_binary(const string &text) {
-    std::string binary_str = "";
+    string binary_str = "";
     
     for (char c : text) {
         // Przekształcamy każdy znak w jego binarną reprezentację
-        binary_str += std::bitset<8>(c).to_string();
+        binary_str += bitset<8>(c).to_string();
     }
     
     return binary_str;
@@ -376,87 +385,218 @@ void test_expand() {
     }
 }
 
-int main() {
-    string input = "Your lips are smoother than vaseline";
-    //string binary_input = text_to_binary(input);  // Twoja funkcja konwersji tekstu na binarny ciąg
+// Funkcja deszyfrowania bloku
+bitset<64> decryptBlock(const bitset<64>& block, const vector<bitset<48>>& subkeys) {
+    // Permutacja początkowa (IP)
+    bitset<64> permutedBlock = initial_permutation(block, IP);
 
+    bitset<32> left, right;
+    for (size_t i = 0; i < 32; ++i) {
+        left[i] = permutedBlock[i + 32];
+        right[i] = permutedBlock[i];
+    }
+
+    // Rundy deszyfrowania z odwróconymi kluczami (deszyfrowanie to odwrócenie kolejności rund)
+    for (int round = 15; round >= 0; --round) {
+        // Przekazujemy prawą część, lewą część i klucz rundy
+        auto [newLeft, newRight] = feistel_round(left.to_ullong(), right.to_ullong(), subkeys[round].to_ullong());
+
+        // Ustawiamy nowe wartości
+        left = newLeft;
+        right = newRight;
+    }
+
+    // Po zakończeniu rund, łączymy lewą i prawą część w odpowiedniej kolejności
+    bitset<64> preOutput;
+    for (size_t i = 0; i < 32; ++i) {
+        preOutput[i] = right[i];  // Prawa część staje się pierwszą połową
+        preOutput[i + 32] = left[i];  // Lewa część staje się drugą połową
+    }
+
+    // Ostateczna permutacja (IP^-1)
+    return final_permutation(preOutput, IP_inverse); // Zamień IP na IP^-1, jeśli to odpowiednia permutacja końcowa
+}
+
+// Funkcja wczytująca klucze z pliku i odwracająca ich kolejność
+vector<bitset<48>> loadReversedSubkeys(const string& filename) {
+    ifstream file(filename, ios::binary);
+    if (!file) {
+        cerr << "Nie można otworzyć pliku: " << filename << endl;
+        exit(1);
+    }
+
+    vector<bitset<48>> subkeys(16);
+    for (int i = 0; i < 16; ++i) {
+        bitset<48> subkey;
+        for (int j = 0; j < 48; ++j) {
+            char bit;
+            file.read(&bit, 1);
+            subkey[47 - j] = bit - '0';
+        }
+        subkeys[15 - i] = subkey; // Odwrócenie kolejności
+    }
+
+    file.close();
+    return subkeys;
+}
+
+// int main() {
+//     string input = "Your lips are smoother than vaseline";
+//     //string binary_input = text_to_binary(input);  // Twoja funkcja konwersji tekstu na binarny ciąg
+
+//     string hex_masterkey = "0E329232EA6D0D73"; 
+//     bitset<64> masterkeyBitset = stringToBitset64(hex_masterkey);
+//     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
+
+//     cout << "Podany tekst hexadecymalnie: ";
+//     cout << textToHex(input, 8)<<  endl;
+//     cout << endl;
+
+//     // Konwertujemy ciąg binarny na 64-bitowe bloki
+//     vector<string> blocks = split_into_blocks(input);
+
+//     // Wypisujemy oryginalne bloki przed inicjalną permutacją
+//     cout << "Bloki przed inicjalną permutacją: " << endl;
+//     for (const auto &block : blocks) {
+//         cout << block << endl;
+//     }
+
+//     // Przetwarzamy każdy blok przez inicjalną permutację
+//     for (const auto &block : blocks) {
+//         // Tworzymy bitset 64-bitowy z bloku
+//         bitset<64> block_bitset(block);
+        
+//         // Wykonanie inicjalnej permutacji
+//         bitset<64> permuted_block = initial_permutation(block_bitset, IP);
+
+//         // Wypisanie permutowanego bloku
+//         cout << permuted_block << endl;
+//     }
+
+//     // Wyświetlanie kluczy rundowych -- sprawdzone, funkcja dziala
+//     for (int i = 0; i < round_keys.size(); ++i) {
+//         cout << "Round " << i + 1 << " key: " << round_keys[i] << endl;
+//     }
+
+//     // Iteracja po blokach, wykonywanie rund Feistela
+//     for (int block_idx = 0; block_idx < blocks.size(); ++block_idx) {
+//         string block = blocks[block_idx];
+//         uint32_t L = bitset<32>(block.substr(0, 32)).to_ulong();
+//         uint32_t R = bitset<32>(block.substr(32, 32)).to_ulong();
+
+//         cout << "Przetwarzany blok " << block_idx + 1 << ": " << endl;
+//         cout << "L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+
+//     for (int i = 15; i >= 0; --i) {
+//         uint64_t round_key = round_keys[i].to_ullong(); // Konwersja klucza na uint64_t
+//         cout << "Runda " << (16 - i) << " z kluczem: " << bitset<48>(round_key) << endl;
+
+//         // Wywołanie rundy Feistela
+//         tie(L, R) = feistel_round(L, R, round_key); // Wykonanie rundy Feistela
+//         cout << "Po rundzie " << (16 - i) << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+// }
+//         // Zamiana miejsc po 16 rundach
+//         swap(L, R);
+//         uint32_t final_L = L;
+//         uint32_t final_R = R;
+
+//         // Przed finalną permutacją
+//         bitset<64> final_block = final_permutation((static_cast<uint64_t>(final_L) << 32) | final_R, FP);
+//         cout << "Blok po 16 rundach i finalnej permutacji: ";
+        
+//         // Wypisanie finalnego bloku w formacie szesnastkowym
+//         cout << "Blok " << block_idx + 1 << ": 0x" << uppercase << hex << setw(16) << setfill('0') << final_block.to_ullong() << endl;
+//     }
+
+//     return 0;
+// }
+
+// int main() {
+//     string input = "Your lips are smoother than vaseline";
+//     //string binary_input = text_to_binary(input);  // Twoja funkcja konwersji tekstu na binarny ciąg
+
+//     string hex_masterkey = "0E329232EA6D0D73"; 
+//     bitset<64> masterkeyBitset = stringToBitset64(hex_masterkey);
+//     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
+
+//     cout << "Podany tekst hexadecymalnie: ";
+//     cout << textToHex(input, 8) << endl;
+//     cout << endl;
+
+//     // Konwertujemy ciąg binarny na 64-bitowe bloki
+//     vector<string> blocks = split_into_blocks(input);
+
+//     // Wypisujemy oryginalne bloki przed inicjalną permutacją
+//     cout << "Bloki przed inicjalną permutacją: " << endl;
+//     for (const auto &block : blocks) {
+//         cout << block << endl;
+//     }
+
+//     // Iteracja po blokach, wykonywanie rund Feistela
+//     for (int block_idx = 0; block_idx < blocks.size(); ++block_idx) {
+//         string block = blocks[block_idx];
+//         bitset<64> block_bitset(block);
+        
+//         // Wykonanie inicjalnej permutacji
+//         bitset<64> permuted_block = initial_permutation(block_bitset, IP);  // Używamy permutacji IP
+
+//         // Rozdzielenie na lewą i prawą część
+//         uint32_t L = permuted_block.to_ulong() >> 32;
+//         uint32_t R = permuted_block.to_ulong() & 0xFFFFFFFF;
+
+//         cout << "Przetwarzany blok " << block_idx + 1 << ": " << endl;
+//         cout << "L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+
+//         // Rundy deszyfrowania z odwróconymi kluczami (od 15 do 0)
+//         for (int i = 15; i >= 0; --i) {
+//             uint64_t round_key = round_keys[i].to_ullong();  // Klucz rundy
+//             cout << "Runda " << (16 - i) << " z kluczem: " << bitset<48>(round_key) << endl;
+
+//             // Wywołanie rundy Feistela
+//             tie(L, R) = feistel_round(L, R, round_key);  // Wykonanie rundy Feistela
+//             cout << "Po rundzie " << (16 - i) << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
+//         }
+
+//         // Zamiana miejsc po 16 rundach
+//         swap(L, R);
+        
+//         // Przed finalną permutacją (IP^-1)
+//         bitset<64> final_block = final_permutation((static_cast<uint64_t>(L) << 32) | R, IP_inverse);  // IP^-1 na końcu
+//         cout << "Blok po 16 rundach i finalnej permutacji: ";
+        
+//         // Wypisanie finalnego bloku w formacie szesnastkowym
+//         cout << "Blok " << block_idx + 1 << ": 0x" << uppercase << hex << setw(16) << setfill('0') << final_block.to_ullong() << endl;
+//     }
+
+//     return 0;
+// }
+
+int main() {
+    // Klucz główny
     string hex_masterkey = "0E329232EA6D0D73"; 
     bitset<64> masterkeyBitset = stringToBitset64(hex_masterkey);
     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
 
-    cout << "Podany tekst hexadecymalnie: ";
-    cout << textToHex(input, 8)<<  endl;
-    cout << endl;
+    cout << "Klucz główny (w szesnastkowo): " << hex << uppercase << setw(16) << setfill('0') << masterkeyBitset.to_ullong() << endl;
 
-    // Konwertujemy ciąg binarny na 64-bitowe bloki
-    vector<string> blocks = split_into_blocks(input);
+    // Bloki do odszyfrowania
+    vector<string> encrypted_blocks = {
+        "5F381D838059F01E", "F7EC72F42157BB40", 
+        "F4C312059F9A6386", "6E163F14940F223D", "9CA350518752E038"
+    };
 
-    // Wypisujemy oryginalne bloki przed inicjalną permutacją
-    cout << "Bloki przed inicjalną permutacją: " << endl;
-    for (const auto &block : blocks) {
-        cout << block << endl;
-    }
+    // Odszyfrowanie bloków
+    for (const auto& hex_block : encrypted_blocks) {
+        bitset<64> block_bitset = hexToBitset64(hex_block);  // Konwersja bloku hex na bitset
 
-    // Przetwarzamy każdy blok przez inicjalną permutację
-    for (const auto &block : blocks) {
-        // Tworzymy bitset 64-bitowy z bloku
-        bitset<64> block_bitset(block);
-        
-        // Wykonanie inicjalnej permutacji
-        bitset<64> permuted_block = initial_permutation(block_bitset, IP);
+        // Deszyfrowanie bloku
+        bitset<64> decrypted_block = decryptBlock(block_bitset, round_keys);
 
-        // Wypisanie permutowanego bloku
-        cout << permuted_block << endl;
-    }
+        // Konwersja odszyfrowanego bloku na tekst
+        string decrypted_text = bitsetToText(decrypted_block);
 
-    // Wyświetlanie kluczy rundowych -- sprawdzone, funkcja dziala
-    for (int i = 0; i < round_keys.size(); ++i) {
-        cout << "Round " << i + 1 << " key: " << round_keys[i] << endl;
-    }
-
-    // Dzielimy tekst na 64-bitowe bloki
-    //vector<string> blocks = split_into_blocks(input);
-
-    // Iteracja po blokach, wykonywanie rund Feistela
-    for (int block_idx = 0; block_idx < blocks.size(); ++block_idx) {
-        string block = blocks[block_idx];
-        uint32_t L = bitset<32>(block.substr(0, 32)).to_ulong();
-        uint32_t R = bitset<32>(block.substr(32, 32)).to_ulong();
-
-        cout << "Przetwarzany blok " << block_idx + 1 << ": " << endl;
-        cout << "L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
-
-        // // Przeprowadzenie 16 rund Feistela
-        // for (int i = 0; i < 16; ++i) {
-        //     uint64_t round_key = round_keys[i].to_ullong(); // Konwersja klucza na uint64_t
-        //     cout << "Runda " << i + 1 << " z kluczem: " << bitset<48>(round_key) << endl;
-
-        //     // Wywołanie rundy Feistela
-        //     tie(L, R) = feistel_round(L, R, round_key); // Wykonanie rundy Feistela
-        //     cout << "Po rundzie " << i + 1 << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
-        // }
-
-    for (int i = 15; i >= 0; --i) {
-        uint64_t round_key = round_keys[i].to_ullong(); // Konwersja klucza na uint64_t
-        cout << "Runda " << (16 - i) << " z kluczem: " << bitset<48>(round_key) << endl;
-
-        // Wywołanie rundy Feistela
-        tie(L, R) = feistel_round(L, R, round_key); // Wykonanie rundy Feistela
-        cout << "Po rundzie " << (16 - i) << ": L = " << bitset<32>(L) << ", R = " << bitset<32>(R) << endl;
-}
-        
-
-        // Zamiana miejsc po 16 rundach
-        swap(L, R);
-        uint32_t final_L = L;
-        uint32_t final_R = R;
-
-        // Przed finalną permutacją
-        bitset<64> final_block = final_permutation((static_cast<uint64_t>(final_L) << 32) | final_R, FP);
-        cout << "Blok po 16 rundach i finalnej permutacji: ";
-        
-        // Wypisanie finalnego bloku w formacie szesnastkowym
-        cout << "Blok " << block_idx + 1 << ": 0x" << uppercase << hex << setw(16) << setfill('0') << final_block.to_ullong() << endl;
+        // Wyświetlanie odszyfrowanego tekstu
+        cout << "Odszyfrowany tekst: " << decrypted_text << endl;
     }
 
     return 0;
