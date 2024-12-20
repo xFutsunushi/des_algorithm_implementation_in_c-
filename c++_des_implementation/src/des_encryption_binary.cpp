@@ -63,16 +63,29 @@ vector<uint64_t> stringToUint64(const string& input) {
     return result;
 }
 
-bitset<32> permute_P(const bitset<32>& sbox_result) {
+bitset<32> permute_P(const bitset<32>& sbox_result, const array<int, 32>& P, bool debug = false) {
     bitset<32> pbox_result;
-    
+
     for (int i = 0; i < 32; ++i) {
-        int bit_position = P[i] - 1;  // Indeksowanie od 1 w permutacji
-        pbox_result[31 - i] = sbox_result[bit_position];  // Ustawiamy bity zgodnie z permutacją
+        // Indeksowanie od lewej do prawej w P, dostosowanie do indeksów bitset
+        int bit_position = 31 - (P[i] - 1);
+
+        // Przypisanie bitu z sbox_result do odpowiedniej pozycji w pbox_result
+        pbox_result[i] = sbox_result[bit_position];
+
+        // Debugowanie
+        if (debug) {
+            cout << "Przed permutacją: bit " << i << " z P[" << i << "] = " << P[i]
+                 << ", wartość: " << sbox_result[bit_position] << endl;
+            cout << "Po permutacji: bit " << i << " w pbox_result[" << i << "] = "
+                 << pbox_result[i] << endl;
+        }
     }
 
     return pbox_result;
 }
+
+
 
 // Funkcja permutacji z debugowaniem
 bitset<64> initial_permutation(const bitset<64>& input, const array<int, 64>& IP) {
@@ -312,10 +325,10 @@ bitset<32> apply_sboxes(bitset<48> xor_result, bool debug = false) {
     bitset<32> sbox_result;
 
     for (int i = 0; i < 8; ++i) {
-        // Wydzielamy odpowiednie 6 bitów z xor_result
+        // Zmieniamy sposób wyciągania bitów, zapewniając odpowiednią kolejność
         bitset<6> chunk;
         for (int j = 0; j < 6; ++j) {
-            chunk[j] = xor_result[6 * i + j];  // Pobieramy 6 bitów na podstawie indeksów
+            chunk[j] = xor_result[47 - (6 * i + (5 - j))]; // Odczytujemy bity od lewej do prawej
         }
 
         if (debug) {
@@ -323,12 +336,14 @@ bitset<32> apply_sboxes(bitset<48> xor_result, bool debug = false) {
         }
 
         // Wyciągamy bity rzędu (pierwszy i ostatni bit)
+        bitset<1> row_bit1(chunk[0]); // Pierwszy bit
+        bitset<1> row_bit2(chunk[5]); // Ostatni bit
         bitset<2> row;
-        row[0] = chunk[0];  // Przypisujemy pierwszy bit
-        row[1] = chunk[5];  // Przypisujemy ostatni bit
+        row[0] = row_bit1[0]; // Przypisujemy pierwszy bit
+        row[1] = row_bit2[0]; // Przypisujemy ostatni bit
 
         if (debug) {
-            cout << "Rząd: " << row << " (bity: " << chunk[0] << ", " << chunk[5] << ")" << endl;
+            cout << "Rząd: " << row << " (bity: " << row_bit1[0] << ", " << row_bit2[0] << ")" << endl;
         }
 
         // Wyciągamy bity kolumny (środkowe 4 bity)
@@ -342,14 +357,22 @@ bitset<32> apply_sboxes(bitset<48> xor_result, bool debug = false) {
         }
 
         // Znajdujemy wartość z odpowiedniego S-Boxa i zapisujemy ją w wyniku
-        bitset<4> sbox_value = SBOX[i][row.to_ulong()][col_bits.to_ulong()]; // Wartość z S-Boxa
+        bitset<8> sbox_value = SBOX[i][row.to_ulong()][col_bits.to_ulong()]; // Wartość z S-Boxa
 
         if (debug) {
             cout << "Wartość z S-Boxa: " << sbox_value << endl;
         }
 
         // Przekształcamy sbox_value do bitset<32> (przesuwamy ją na odpowiednią pozycję)
-        sbox_result |= (sbox_value.to_ulong() << (4 * (7 - i))); // Przesuwamy i ustawiamy w odpowiednich bitach
+        bitset<32> sbox_value_32;
+        sbox_value_32 |= (sbox_value.to_ulong() << (4 * (7 - i))); // Przesuwamy i ustawiamy w odpowiednich bitach
+
+        if (debug) {
+            cout << "Wartość S-Boxa po przesunięciu: " << sbox_value_32 << endl;
+        }
+
+        // Łączymy sbox_result z nową wartością
+        sbox_result |= sbox_value_32;
 
         if (debug) {
             cout << "sbox_result po dodaniu: " << sbox_result << endl;
@@ -358,6 +381,7 @@ bitset<32> apply_sboxes(bitset<48> xor_result, bool debug = false) {
 
     return sbox_result;
 }
+
 
 // Funkcja rundy Feistela
 pair<bitset<32>, bitset<32>> feistel_round(bitset<32> L, bitset<32> R, bitset<48> round_key) {
@@ -372,12 +396,12 @@ pair<bitset<32>, bitset<32>> feistel_round(bitset<32> L, bitset<32> R, bitset<48
     cout << "R po XOR z kluczem rundy: " << xor_result << endl;
     cout << endl;
 
-    // Zastosowanie S-boxów (musisz dostosować funkcję, by działała na bitset<48>)
+    // Zastosowanie S-boxów 
     bitset<32> sbox_result = apply_sboxes(xor_result, true); // Zmieniamy na bitset<32>
     cout << "Wynik po S-Boxach: " << sbox_result << endl;
 
     // Permutacja P
-    bitset<32> pbox_result = permute_P(sbox_result); // Funkcja permute_P powinna zwracać bitset<32>
+    bitset<32> pbox_result = permute_P(sbox_result, P, true); // Funkcja permute_P powinna zwracać bitset<32>
     cout << "Wynik permutacji P: " << pbox_result << endl;
 
     // XOR z lewą częścią
@@ -451,8 +475,8 @@ int main() {
             L[i] = permuted_block[i + 32];     // Kolejne 32 bity idą do R
     }
 
-    // Wyświetlamy L0 i R0 po podzieleniu
-    cout << "L0: " << L << ", R0: " << R << endl;
+        // Wyświetlamy L0 i R0 po podzieleniu
+        cout << "L0: " << L << ", R0: " << R << endl;
 
         // Przeprowadzenie 16 rund Feistela
         for (int i = 0; i < 16; ++i) {
