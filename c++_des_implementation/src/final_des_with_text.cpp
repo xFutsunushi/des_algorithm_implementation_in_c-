@@ -31,12 +31,38 @@ string binaryToText(const string &binary) {
     return plaintext;
 }
 
+vector<bitset<64>> split_string_into_binary_blocks(const string &input) {
+    vector<bitset<64>> blocks;
+    size_t block_size = 64;  // Rozmiar bloku 64 bity
+    size_t input_size = input.size() * 8;  // Rozmiar wejścia w bitach
+
+    // Konwertujemy string na ciąg bitów
+    string binary_input = "";
+    for (char c : input) {
+        binary_input += bitset<8>(c).to_string();
+    }
+
+    // Upewniamy się, że ciąg ma długość podzielną przez 64 bity
+    if (binary_input.size() % block_size != 0) {
+        size_t padding_size = block_size - (binary_input.size() % block_size);
+        binary_input.append(padding_size, '0');  // Dodajemy padding
+    }
+
+    // Dzielimy ciąg bitów na 64-bitowe bloki
+    for (size_t i = 0; i < binary_input.size(); i += block_size) {
+        bitset<64> block(binary_input.substr(i, block_size));
+        blocks.push_back(block);
+    }
+
+    return blocks;
+}
+
 string textToHex(const string& text, size_t blockSize = 4) {
-    std::stringstream hexStream;
+    stringstream hexStream;
     size_t count = 0;
 
     for (char c : text) {
-        hexStream << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << static_cast<int>(static_cast<unsigned char>(c));
+        hexStream << hex << uppercase << setw(2) << setfill('0') << static_cast<int>(static_cast<unsigned char>(c));
         count++;
 
         // Dodaj spację co "blockSize" znaków, aby poprawić czytelność
@@ -48,7 +74,6 @@ string textToHex(const string& text, size_t blockSize = 4) {
     return hexStream.str();
 }
 
-// Funkcja do konwersji tekstu na uint64_t
 vector<uint64_t> stringToUint64(const string& input) {
     vector<uint64_t> result;
     size_t len = input.length();
@@ -85,36 +110,17 @@ bitset<32> permute_P(const bitset<32>& sbox_result, const array<int, 32>& P, boo
     return pbox_result;
 }
 
-// Funkcja permutacji z debugowaniem
 bitset<64> initial_permutation(const bitset<64>& input, const array<int, 64>& IP) {
     bitset<64> permuted;
-    //cout << "\nDebugowanie Initial Permutation (IP):" << endl;
-
-    // for (int i = 0; i < 64; ++i) {
-    //     // Indeksowanie w tablicy IP jest od 1, więc odejmujemy 1, aby uzyskać indeks 0-bazowy
-    //     int bit_position = IP[i] - 1;
-    //     permuted[63 - i] = input[63 - bit_position];
-
-    //     // Wypisanie szczegółowych informacji o operacji
-    //     cout << "Pozycja bitu w wejściu: " << (63 - bit_position) 
-    //          << " (bit: " << input[63 - bit_position] << ") -> "
-    //          << "Pozycja w wyniku: " << (63 - i) << endl;
-    // }
 
         bitset<64> output;
         for (size_t i = 0; i < 64; ++i) {
             output[63 - i] = input[64 - IP[i]]; // Mapowanie pozycji zgodnie z tablicą IP
-
-        // Debug: wyświetl mapowanie dla każdego bitu
-        //cout << "Pozycja bitu w wejściu: " << (64 - IP[i])
-        //    << " (bit: " << input[64 - IP[i]] << ") -> Pozycja w wyniku: " << (63 - i) << std::endl;
     }
 
     return output;
 }
-// Funkcja pomocnicza do konwersji 64-bitowego klucza do bitów
 
-// Funkcja konwertująca tekst na ciąg binarny
 string text_to_binary(const string &text) {
     string binary_str = "";
     
@@ -225,7 +231,6 @@ bitset<28> rotate_left(const bitset<28>& input, int shift) {
     return (input << shift) | (input >> (28 - shift));
 }
 
-// Funkcja generująca klucze rundowe
 vector<bitset<48>> generate_round_keys(const bitset<64>& key) {
     vector<bitset<48>> round_keys;
 
@@ -268,7 +273,6 @@ vector<bitset<48>> generate_round_keys(const bitset<64>& key) {
     return round_keys;
 }
 
-// Funkcja do zapisania kluczy rundowych do pliku
 void save_round_keys(const vector<bitset<48>>& round_keys, const string& filename) {
     ofstream file(filename, ios::binary); // Otwieramy plik w trybie binarnym
 
@@ -296,7 +300,6 @@ void save_round_keys(const vector<bitset<48>>& round_keys, const string& filenam
     cout << "Klucze rundowe zostały zapisane do pliku: " << filename << endl;
 }
 
-// Funkcja do wczytania kluczy rundowych z pliku
 void load_round_keys(vector<bitset<48>>& round_keys, const string& filename) {
     ifstream file(filename, ios::binary); // Otwieramy plik w trybie binarnym
 
@@ -373,15 +376,13 @@ bitset<32> apply_sboxes(bitset<48> xor_result, bool debug = false) {
         sbox_result |= sbox_value_32;
 
         if (debug) {
-            cout << "sbox_result po dodaniu: " << sbox_result << endl;
+            cout << "Sbox_result po dodaniu: " << sbox_result << endl;
         }
     }
 
     return sbox_result;
 }
 
-
-// Funkcja rundy Feistela
 pair<bitset<32>, bitset<32>> feistel_round(bitset<32> L, bitset<32> R, bitset<48> round_key) {
     cout << "Przed rundą Feistela: L = " << L << ", R = " << R << endl;
     
@@ -399,7 +400,7 @@ pair<bitset<32>, bitset<32>> feistel_round(bitset<32> L, bitset<32> R, bitset<48
     cout << "Wynik po S-Boxach: " << sbox_result << endl;
 
     // Permutacja P
-    bitset<32> pbox_result = permute_P(sbox_result, P, false); // Funkcja permute_P powinna zwracać bitset<32>
+    bitset<32> pbox_result = permute_P(sbox_result, P, true); // Funkcja permute_P powinna zwracać bitset<32>
     cout << "Wynik permutacji P: " << pbox_result << endl;
 
     // XOR z lewą częścią
@@ -420,41 +421,32 @@ bitset<64> final_permutation(const bitset<64>& block, const array<int, 64>& perm
     return permuted_block;
 }
 
-// void test_expand() {
-//     bitset<32> test_R = 0b11110000101010101111000010101010;
-//     bitset<64> expected_result = 0b011110100001010101010101011110100001010101010101;
-//     bitset<64> actual_result = expand(test_R);
-    
-//     cout << "Input R: " << bitset<32>(test_R) << endl;
-//     cout << "Expanded R: " << bitset<48>(actual_result) << endl;
-
-//     if (actual_result == expected_result) {
-//         cout << "Test PASSED!" << endl;
-//     } else {
-//         cout << "Test FAILED!" << endl;
-//         cout << "Expected: " << bitset<48>(expected_result) << endl;
-//     }
-// }
 
 int main() {
-    bitset<64> input("0000000100100011010001010110011110001001101010111100110111101111");
-    //bitset<64> input("010110010110111101110101011100100010000001101100011010010111000001110011001000000110000101110010011001010010000001110011011011010110111101101111011101000110100001100101011100100010000001110100011010000110000101101110001000000111011001100001011100110110010101101100011010010110111001100101");
-    string hex_masterkey = "133457799BBCDFF1";
-
+    string input = "Your lips are smoother than vaseline";
+    string hex_masterkey = "0E329232EA6D0D73"; // For Text text
     bitset<64> masterkeyBitset = stringToBitset64(hex_masterkey);
     vector<bitset<48>> round_keys = generate_round_keys(masterkeyBitset);
-    vector<bitset<64>> blocks = split_binary_into_blocks(input);
+
+    // Dzielimy tekst na 64-bitowe bloki
+    vector<bitset<64>> blocks = split_string_into_binary_blocks(input);
+
+    // Wypisanie podzielonych bloków
+    cout << "Podzielone bloki: " << endl;
+    for (const auto &block : blocks) {
+        cout << block << endl;
+    }
 
     // Wypisujemy oryginalne bloki przed inicjalną permutacją
     for (const auto &block : blocks) {
-        cout << "Blok przed initial Permutation: " << block << endl;
+        //cout << "Blok przed initial Permutation: " << block << endl;
     }
 
     // Przetwarzamy każdy blok 64 bitowy przez inicjalną permutację
     for (const auto &block : blocks) {
         // Wykonanie inicjalnej permutacji
         bitset<64> permuted_block = initial_permutation(block, IP);
-        cout << "Wynik po Initial Permutation: " << permuted_block << endl;
+        //cout << "Wynik po Initial Permutation: " << permuted_block << endl;
     }
 
     // // Wyświetlanie kluczy rundowych -- sprawdzone, funkcja dziala
