@@ -111,7 +111,7 @@ int main(){
     for (int rowNum = 0; rowNum < matrixSize; rowNum++){
         cout << " | ";
         for (int columnNum = 0; columnNum < matrixSize; columnNum++){
-            ourMatrix[rowNum][columnNum] = 10 + rand() % 101;
+            ourMatrix[rowNum][columnNum] = 0 + rand() % 101;
             cout << setw(4) << ourMatrix[rowNum][columnNum] << " ";
         }
         cout << " | " << endl; 
@@ -124,7 +124,7 @@ int main(){
 
     cout << "\n Suma według wierszy: \n";
     for ( int i = 0 ; i < matrixSize; i++ ){
-        cout << i + 1 << "po wierszach: " << rowSum[i] << endl;
+        cout << i + 1 << " po wierszach: " << rowSum[i] << endl;
     }
 
     for (int i = 1; i < matrixSize; i++){
