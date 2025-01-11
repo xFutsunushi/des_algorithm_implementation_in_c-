@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 
 using namespace std;
 
@@ -26,18 +27,31 @@ using namespace std;
 // }
 
 
+// int main (){
+
+//     int N;
+//     cout << "Podaj rozmiar tablicy: ";
+//     cin >> N;
+
+//     int value = 1;
+
+//     for ( int i = 1; i < N; i++ ){
+//         for ( int j = 0; j < N; j++ ){
+//             cout << value++ << "\t";
+//         }
+//         cout << endl;
+//    }
+// }
+
 int main (){
 
-    int N;
-    cout << "Podaj rozmiar tablicy: ";
-    cin >> N;
-
-    int value = 1;
-
-    for ( int i = 1; i < N; i++ ){
-        for ( int j = 0; j < N; j++ ){
-            cout << value++ << "\t";
+    const int rows = 9, cols = 9;
+    int ourMatrix[rows][cols]  = {};
+    for ( int i = 1; i <= rows; i++) {
+        for ( int j = 1; j <= cols; j++ ) {
+            ourMatrix[i-1][j-1] = i * j;
+            cout << setw(4) << ourMatrix[i-1][j-1];
         }
-        cout << endl;
-   }
+    cout << endl;
+    }
 }
