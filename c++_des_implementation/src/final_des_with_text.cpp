@@ -88,7 +88,8 @@ vector<uint64_t> stringToUint64(const string& input) {
     return result;
 }
 
-bitset<32> permute_P(const bitset<32>& sbox_result, const array<int, 32>& P, bool debug = false) {
+bitset<32> permute_P(const bitset<32>& sbox_result, const array<int, 32>& P, bool
+ debug = false) {
     bitset<32> pbox_result;
 
     for (int i = 0; i < 32; ++i) {
