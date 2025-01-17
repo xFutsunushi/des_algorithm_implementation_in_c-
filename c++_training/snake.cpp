@@ -8,7 +8,7 @@
 using namespace std;
 
 // Wymiary planszy
-const int width = 20;
+const int width = 40;
 const int height = 20;
 
 // Zmienne gry
